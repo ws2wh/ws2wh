@@ -1,31 +1,37 @@
 package server
 
 import (
-	"fmt"
-
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
 	"golang.org/x/net/websocket"
 )
 
 type Server struct {
-	WsPort     uint
-	WhEndpoint string
+	frontendAddr string
+	backendUrl   string
 }
 
-func (s *Server) Serve() {
+func Run(frontendAddr string, backendUrl string) Server {
+	s := Server{
+		frontendAddr: frontendAddr,
+		backendUrl:   backendUrl,
+	}
 
+	s.serve()
+	return s
+}
+
+func (s *Server) serve() {
 	e := echo.New()
 	e.Use(middleware.Logger())
 	e.Logger.SetLevel(log.DEBUG)
 	e.Use(middleware.Recover())
-	e.GET("/", handle)
-	addr := fmt.Sprintf(":%d", s.WsPort)
-	e.Logger.Fatal(e.Start(addr))
+	e.GET("/", s.handle)
+	e.Logger.Fatal(e.Start(s.frontendAddr))
 }
 
-func handle(c echo.Context) error {
+func (s *Server) handle(c echo.Context) error {
 	websocket.Handler(func(ws *websocket.Conn) {
 		websocket.Message.Send(ws, "Hello")
 		for {
