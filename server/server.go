@@ -1,10 +1,12 @@
 package server
 
 import (
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
-	"golang.org/x/net/websocket"
+	"github.com/pmartynski/ws2wh/backend"
+	"github.com/pmartynski/ws2wh/session"
 )
 
 type Server struct {
@@ -23,6 +25,7 @@ func Run(frontendAddr string, backendUrl string) Server {
 }
 
 func (s *Server) serve() {
+	log.SetLevel(log.DEBUG)
 	e := echo.New()
 	e.Use(middleware.Logger())
 	e.Logger.SetLevel(log.DEBUG)
@@ -32,17 +35,17 @@ func (s *Server) serve() {
 }
 
 func (s *Server) handle(c echo.Context) error {
-	websocket.Handler(func(ws *websocket.Conn) {
-		websocket.Message.Send(ws, "Hello")
-		for {
-			var msg string
-			err := websocket.Message.Receive(ws, &msg)
-			if err != nil {
-				c.Logger().Error(err)
-				break
-			}
-			c.Logger().Info(msg)
-		}
-	}).ServeHTTP(c.Response(), c.Request())
+	session.NewSession(session.SessionParams{
+		Id:      uuid.NewString(),
+		Backend: backend.CreateBackend(s.backendUrl),
+
+		Response: c.Response().Writer,
+		Request:  c.Request(),
+	})
+	return nil
+}
+
+func (s *Server) Send(payload *[]byte) error {
+	log.Debug("Sending: ", string((*payload)[:]))
 	return nil
 }
