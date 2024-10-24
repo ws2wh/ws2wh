@@ -15,20 +15,26 @@ type Session struct {
 }
 
 func NewSession(params SessionParams) *Session {
-	// TODO: create ws publish method
 	s := Session{
 		Id:     params.Id,
 		params: params,
 	}
 
-	s.runReceiver()
-
 	return &s
 }
 
-func (s *Session) runReceiver() {
+func (s *Session) Send(message []byte) error {
+	_, e := s.conn.Write(message)
+	return e
+}
+
+func (s *Session) RunReceiver() {
 	websocket.Handler(func(ws *websocket.Conn) {
 		s.conn = ws
+		backend := *s.params.Backend
+		backend.Send(s.Id, []byte("Session open"))
+		defer backend.Send(s.Id, []byte("Session closed"))
+
 		for {
 			var msg []byte
 			e := websocket.Message.Receive(ws, &msg)
@@ -39,14 +45,14 @@ func (s *Session) runReceiver() {
 				break
 			}
 
-			s.params.Backend.Send(&msg)
+			backend.Send(s.Id, msg)
 		}
 	}).ServeHTTP(s.params.Response, s.params.Request)
 }
 
 type SessionParams struct {
 	Id      string
-	Backend backend.Backend
+	Backend *backend.Backend
 
 	Request  *http.Request
 	Response http.ResponseWriter
