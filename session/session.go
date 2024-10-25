@@ -9,14 +9,12 @@ import (
 )
 
 type Session struct {
-	Id     string
 	params SessionParams
 	conn   *websocket.Conn
 }
 
 func NewSession(params SessionParams) *Session {
 	s := Session{
-		Id:     params.Id,
 		params: params,
 	}
 
@@ -31,13 +29,21 @@ func (s *Session) Send(message []byte) error {
 func (s *Session) RunReceiver() {
 	websocket.Handler(func(ws *websocket.Conn) {
 		s.conn = ws
-		backend := *s.params.Backend
-		backend.Send(s.Id, []byte("Session open"))
-		defer backend.Send(s.Id, []byte("Session closed"))
+		b := *s.params.Backend
+		msg := backend.WsMessage{
+			SessionId:    s.params.Id,
+			ReplyChannel: s.params.ReplyChannel,
+			Event:        backend.ClientConnected,
+			Payload:      make([]byte, 0),
+		}
+		b.Send(msg)
+
+		msg.Event = backend.ClientDisconnected
+		defer b.Send(msg)
 
 		for {
-			var msg []byte
-			e := websocket.Message.Receive(ws, &msg)
+			var incomingMsg []byte
+			e := websocket.Message.Receive(ws, &incomingMsg)
 			if e != nil && e.Error() != "EOF" {
 				log.Error(e)
 			}
@@ -45,14 +51,20 @@ func (s *Session) RunReceiver() {
 				break
 			}
 
-			backend.Send(s.Id, msg)
+			b.Send(backend.WsMessage{
+				SessionId:    s.params.Id,
+				ReplyChannel: s.params.ReplyChannel,
+				Event:        backend.MessageReceived,
+				Payload:      incomingMsg,
+			})
 		}
 	}).ServeHTTP(s.params.Response, s.params.Request)
 }
 
 type SessionParams struct {
-	Id      string
-	Backend *backend.Backend
+	Id           string
+	ReplyChannel string
+	Backend      *backend.Backend
 
 	Request  *http.Request
 	Response http.ResponseWriter
