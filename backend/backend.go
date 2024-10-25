@@ -7,8 +7,8 @@ import (
 	"net/http"
 )
 
-const SessionIdHeader = "WS-Session-Id"
-const ReplyChannelHeader = "WS-Reply-Channel"
+const SessionIdHeader = "Ws-Session-Id"
+const ReplyChannelHeader = "Ws-Reply-Channel"
 const EventHeader = "Ws-Event"
 
 type WsEvent int
@@ -51,9 +51,13 @@ type WsMessage struct {
 	Payload      []byte
 }
 
+type HttpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type webhook struct {
 	url    string
-	client *http.Client
+	client HttpClient
 }
 
 func (w *webhook) Send(msg WsMessage) error {
@@ -74,7 +78,7 @@ func (w *webhook) Send(msg WsMessage) error {
 		return err
 	}
 
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		_, err := io.ReadAll(res.Body)
 		if err != nil {
 			return err
