@@ -75,12 +75,12 @@ func (w *webhook) Send(msg WsMessage) error {
 	}
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
-		body, err := io.ReadAll(res.Body)
+		_, err := io.ReadAll(res.Body)
 		if err != nil {
 			return err
 		}
 
-		return fmt.Errorf("unsuccessful delivery %s\n%s", w.url, string(body))
+		return fmt.Errorf("unsuccessful delivery to %s", w.url)
 	}
 
 	return nil

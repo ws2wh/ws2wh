@@ -47,12 +47,13 @@ func (s *Server) Serve() {
 
 func (s *Server) handle(c echo.Context) error {
 	id := uuid.NewString()
-	s.sessions[id] = session.NewSession(session.SessionParams{
-		Id:      id,
-		Backend: &s.DefaultBackend,
 
-		Response: c.Response().Writer,
-		Request:  c.Request(),
+	s.sessions[id] = session.NewSession(session.SessionParams{
+		Id:           id,
+		Backend:      &s.DefaultBackend,
+		ReplyChannel: fmt.Sprintf("%s://%s/%s", c.Scheme(), c.Request().Host, id),
+		Response:     c.Response().Writer,
+		Request:      c.Request(),
 	})
 	defer delete(s.sessions, id)
 
@@ -67,10 +68,15 @@ func (s *Server) send(c echo.Context) error {
 	session := s.sessions[id]
 
 	if session == nil {
-		c.String(http.StatusNotFound, "Session not found")
+		c.JSON(http.StatusNotFound, SessionResponse{Success: false, Message: "NOT_FOUND"})
 	}
 
 	session.Send(body)
 
-	return c.String(200, fmt.Sprintf("%s -> OK: %s", id, string(body)))
+	return c.JSON(http.StatusOK, SessionResponse{Success: true})
+}
+
+type SessionResponse struct {
+	Success bool        `json:"success"`
+	Message interface{} `json:"message,omitempty"`
 }
