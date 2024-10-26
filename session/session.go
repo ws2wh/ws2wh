@@ -29,7 +29,7 @@ func (s *Session) Send(message []byte) error {
 func (s *Session) RunReceiver() {
 	websocket.Handler(func(ws *websocket.Conn) {
 		s.conn = ws
-		b := *s.params.Backend
+		b := s.params.Backend
 		msg := backend.WsMessage{
 			SessionId:    s.params.Id,
 			ReplyChannel: s.params.ReplyChannel,
@@ -64,7 +64,7 @@ func (s *Session) RunReceiver() {
 type SessionParams struct {
 	Id           string
 	ReplyChannel string
-	Backend      *backend.Backend
+	Backend      backend.Backend
 
 	Request  *http.Request
 	Response http.ResponseWriter

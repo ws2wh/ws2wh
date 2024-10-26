@@ -50,7 +50,7 @@ func (s *Server) handle(c echo.Context) error {
 
 	s.sessions[id] = session.NewSession(session.SessionParams{
 		Id:           id,
-		Backend:      &s.DefaultBackend,
+		Backend:      s.DefaultBackend,
 		ReplyChannel: fmt.Sprintf("%s://%s/%s", c.Scheme(), c.Request().Host, id),
 		Response:     c.Response().Writer,
 		Request:      c.Request(),
