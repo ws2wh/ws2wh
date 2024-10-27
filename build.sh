@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-go build -o out/
+go build cmd/ws2wh/main.go -o out/ws2wh
