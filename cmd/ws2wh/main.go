@@ -20,5 +20,5 @@ func main() {
 		log.Fatalf("Invalid backend URL: %s, err: %s", *backUrl, e)
 	}
 
-	server.CreateServer(*frontAddr, *backUrl).Serve()
+	server.CreateServer(*frontAddr, *backUrl).Start()
 }

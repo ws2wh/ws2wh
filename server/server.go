@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,10 +19,10 @@ type Server struct {
 	frontendAddr   string
 	backendUrl     string
 	sessions       map[string]*session.Session
+	echoStack      *echo.Echo
 }
 
 func CreateServer(frontendAddr string, backendUrl string) *Server {
-
 	s := Server{
 		frontendAddr: frontendAddr,
 		backendUrl:   backendUrl,
@@ -29,11 +30,6 @@ func CreateServer(frontendAddr string, backendUrl string) *Server {
 	}
 	s.DefaultBackend = backend.CreateBackend(backendUrl)
 
-	return &s
-}
-
-func (s *Server) Serve() {
-	log.SetLevel(log.DEBUG)
 	e := echo.New()
 	e.Use(middleware.Logger())
 	e.Logger.SetLevel(log.DEBUG)
@@ -42,7 +38,20 @@ func (s *Server) Serve() {
 	e.Use(middleware.Recover())
 	e.GET("/", s.handle)
 	e.POST("/:id", s.send)
-	e.Logger.Fatal(e.Start(s.frontendAddr))
+
+	s.echoStack = e
+
+	return &s
+}
+
+func (s *Server) Start() {
+	log.SetLevel(log.DEBUG)
+	e := s.echoStack
+	e.Logger.Info(e.Start(s.frontendAddr))
+}
+
+func (s *Server) Stop() {
+	s.echoStack.Shutdown(context.Background())
 }
 
 func (s *Server) handle(c echo.Context) error {
