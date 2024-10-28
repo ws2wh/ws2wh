@@ -30,7 +30,7 @@ func (s *Session) RunReceiver() {
 	websocket.Handler(func(ws *websocket.Conn) {
 		s.conn = ws
 		b := s.params.Backend
-		msg := backend.WsMessage{
+		msg := backend.BackendMessage{
 			SessionId:    s.params.Id,
 			ReplyChannel: s.params.ReplyChannel,
 			Event:        backend.ClientConnected,
@@ -51,7 +51,7 @@ func (s *Session) RunReceiver() {
 				break
 			}
 
-			b.Send(backend.WsMessage{
+			b.Send(backend.BackendMessage{
 				SessionId:    s.params.Id,
 				ReplyChannel: s.params.ReplyChannel,
 				Event:        backend.MessageReceived,

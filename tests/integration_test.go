@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -14,19 +15,20 @@ import (
 
 func TestWebsocketToWebhook(t *testing.T) {
 	assert := assert.New(t)
-	wsServer := CreateWs()
-	wsServer.Start()
-	defer wsServer.Stop()
+	wsSrv := CreateTestWs()
+	wsSrv.Start()
+	defer wsSrv.Stop()
 
-	testBackend := CreateBackend()
-	testBackend.Start()
-	defer testBackend.Stop()
+	wh := CreateTestWebhook()
+	wh.Start()
+	defer wh.Stop()
 
-	time.Sleep(time.Millisecond * 200)
+	// make sure ws server is up
+	time.Sleep(time.Millisecond * 10)
 
 	conn, err := websocket.Dial(WsUrl, "", OriginUrl)
 	assert.Nil(err)
-	onConnected := testBackend.WaitForMessage()
+	onConnected := wh.WaitForMessage(t)
 	assert.NotNil(onConnected)
 
 	assert.Equal(backend.ClientConnected, onConnected.Event)
@@ -37,13 +39,13 @@ func TestWebsocketToWebhook(t *testing.T) {
 	_, err = conn.Write(clientMsg)
 	assert.Nil(err)
 
-	onMessage := testBackend.WaitForMessage()
+	onMessage := wh.WaitForMessage(t)
 	assert.Equal(sessionId, onMessage.SessionId)
 	assert.Equal(backend.MessageReceived, onMessage.Event)
 	assert.Equal(clientMsg, onMessage.Payload)
 
-	wsChannel := make(chan []byte, 100)
-	go WaitForMessage(conn, wsChannel)
+	wsClientChan := make(chan []byte, 100)
+	go captureMessage(conn, wsClientChan)
 	expectedBackendMsg := []byte(uuid.NewString())
 	resp, err := http.Post(replyUrl, "text/plain", bytes.NewReader(expectedBackendMsg))
 
@@ -51,6 +53,33 @@ func TestWebsocketToWebhook(t *testing.T) {
 	assert.Less(resp.StatusCode, 300)
 	assert.GreaterOrEqual(resp.StatusCode, 200)
 
-	actualBackendMsg := <-wsChannel
+	actualBackendMsg := waitForMessage(t, wsClientChan)
+
 	assert.Equal(expectedBackendMsg, actualBackendMsg)
+
+	conn.Close()
+	onClosed := wh.WaitForMessage(t)
+	assert.NotNil(onClosed)
+	assert.Equal(backend.ClientDisconnected, onClosed.Event)
+	assert.Equal(make([]byte, 0), onClosed.Payload)
+	assert.Equal(sessionId, onClosed.SessionId)
+}
+
+func captureMessage(ws *websocket.Conn, out chan []byte) {
+	var incomingMsg []byte
+	websocket.Message.Receive(ws, &incomingMsg)
+	out <- incomingMsg
+}
+
+func waitForMessage(t *testing.T, out chan []byte) []byte {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	defer cancel()
+
+	select {
+	case m := <-out:
+		return m
+	case <-ctx.Done():
+		t.Errorf("Receiving message via ws client timed out")
+		panic("unreachable")
+	}
 }

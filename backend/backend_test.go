@@ -26,7 +26,7 @@ func TestWebhookSuccess(t *testing.T) {
 		client: &fc,
 	}
 
-	msg := WsMessage{
+	msg := BackendMessage{
 		SessionId:    "ccj12cascdj10c910jc9",
 		ReplyChannel: "http://ws2wh-address/who2033cas",
 		Event:        MessageReceived,
@@ -57,7 +57,7 @@ func TestWebhookClientError(t *testing.T) {
 		client: &fc,
 	}
 
-	err := wh.Send(WsMessage{
+	err := wh.Send(BackendMessage{
 		SessionId:    "ccj12cascdj10c910jc9",
 		ReplyChannel: "http://ws2wh-address/who2033cas",
 		Event:        ClientConnected,
@@ -83,7 +83,7 @@ func TestWebhookServiceError(t *testing.T) {
 		client: &fc,
 	}
 
-	err := wh.Send(WsMessage{
+	err := wh.Send(BackendMessage{
 		SessionId:    "ccj12cascdj10c910jc9",
 		ReplyChannel: "http://ws2wh-address/who2033cas",
 		Event:        ClientDisconnected,

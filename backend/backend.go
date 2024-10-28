@@ -34,7 +34,7 @@ func (e WsEvent) String() string {
 }
 
 type Backend interface {
-	Send(msg WsMessage) error
+	Send(msg BackendMessage) error
 }
 
 func CreateBackend(url string) Backend {
@@ -44,7 +44,7 @@ func CreateBackend(url string) Backend {
 	}
 }
 
-type WsMessage struct {
+type BackendMessage struct {
 	SessionId    string
 	ReplyChannel string
 	Event        WsEvent
@@ -60,7 +60,7 @@ type webhook struct {
 	client HttpClient
 }
 
-func (w *webhook) Send(msg WsMessage) error {
+func (w *webhook) Send(msg BackendMessage) error {
 	req, err := http.NewRequest(http.MethodPost, w.url, bytes.NewReader(msg.Payload))
 	h := http.Header{
 		SessionIdHeader:    {msg.SessionId},
