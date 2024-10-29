@@ -92,7 +92,7 @@ func (w *webhookBackend) Send(msg BackendMessage, callback func([]byte)) error {
 		return err
 	}
 
-	if len(body) > 0 {
+	if len(body) > 0 && msg.Event != ClientDisconnected {
 		callback(body)
 	}
 
