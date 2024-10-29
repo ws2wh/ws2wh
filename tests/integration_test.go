@@ -14,7 +14,6 @@ import (
 )
 
 func TestWebsocketToWebhook(t *testing.T) {
-	assert := assert.New(t)
 	wsSrv := CreateTestWs()
 	wsSrv.Start()
 	defer wsSrv.Stop()
@@ -26,26 +25,47 @@ func TestWebsocketToWebhook(t *testing.T) {
 	// make sure ws server is up
 	time.Sleep(time.Millisecond * 10)
 
+	conn, sessionId, replyUrl := clientConnected(wh, t)
+	websocketClientMessageSent(conn, wh, sessionId, t)
+	backendMessageSent(conn, replyUrl, t)
+	websocketClientMessageWithImmediateBackendResponse(conn, wh, sessionId, t)
+	websocketClientDisconnected(conn, wh, sessionId, t)
+}
+
+func clientConnected(wh *TestWebhook, t *testing.T) (conn *websocket.Conn, sessionId string, replyUrl string) {
+	assert := assert.New(t)
+
 	conn, err := websocket.Dial(WsUrl, "", OriginUrl)
 	assert.Nil(err, "should accept websocket connection")
 	onConnected := wh.WaitForMessage(t)
 	assert.NotNil(onConnected, "received message should not be nil")
 
 	assert.Equal(backend.ClientConnected, onConnected.Event, "should receive on connected event message")
-	sessionId := onConnected.SessionId
-	replyUrl := onConnected.ReplyChannel
+	sessionId = onConnected.SessionId
+	replyUrl = onConnected.ReplyChannel
+	return
+}
+
+func websocketClientMessageSent(conn *websocket.Conn, wh *TestWebhook, sessionId string, t *testing.T) {
+	assert := assert.New(t)
 
 	clientMsg := []byte(uuid.NewString())
-	_, err = conn.Write(clientMsg)
+	_, err := conn.Write(clientMsg)
 	assert.Nil(err, "should successfully send websocket message via ws client")
 
 	onMessage := wh.WaitForMessage(t)
 	assert.Equal(sessionId, onMessage.SessionId, "backend should receive message with expected session id")
 	assert.Equal(backend.MessageReceived, onMessage.Event, "backend should receive messagereceived message")
 	assert.Equal(clientMsg, onMessage.Payload, "backend should receive exact same payload as the ws client sent in request body")
+}
 
-	wsClientChan := make(chan []byte, 100)
+func backendMessageSent(conn *websocket.Conn, replyUrl string, t *testing.T) {
+	assert := assert.New(t)
+
+	wsClientChan := make(chan []byte, 1)
+	defer close(wsClientChan)
 	go captureMessage(conn, wsClientChan)
+
 	expectedBackendMsg := []byte(uuid.NewString())
 	resp, err := http.Post(replyUrl, "text/plain", bytes.NewReader(expectedBackendMsg))
 
@@ -56,9 +76,26 @@ func TestWebsocketToWebhook(t *testing.T) {
 	actualBackendMsg := waitForMessage(t, wsClientChan)
 
 	assert.Equal(expectedBackendMsg, actualBackendMsg, "reply url call body should be received by websocket client connected to session")
+}
+
+func websocketClientMessageWithImmediateBackendResponse(conn *websocket.Conn, wh *TestWebhook, sessionId string, t *testing.T) {
+	assert := assert.New(t)
+	expectedResponse := []byte(uuid.NewString())
+	wh.responses = append(wh.responses, expectedResponse)
+	wsClientChan := make(chan []byte, 1)
+	defer close(wsClientChan)
+	go captureMessage(conn, wsClientChan)
+	websocketClientMessageSent(conn, wh, sessionId, t)
+	actualResponse := waitForMessage(t, wsClientChan)
+	assert.Equal(expectedResponse, actualResponse, "immediate backend response body should be received by websocket client connected to session")
+}
+
+func websocketClientDisconnected(conn *websocket.Conn, wh *TestWebhook, sessionId string, t *testing.T) {
+	assert := assert.New(t)
 
 	conn.Close()
 	onClosed := wh.WaitForMessage(t)
+
 	assert.NotNil(onClosed, "backend should receive non-empty message")
 	assert.Equal(backend.ClientDisconnected, onClosed.Event, "backend received message should have client disconnected event header")
 	assert.Equal(make([]byte, 0), onClosed.Payload, "backend received message should have an empty body")

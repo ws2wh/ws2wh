@@ -13,12 +13,14 @@ import (
 type TestWebhook struct {
 	echoStack *echo.Echo
 	messages  chan backend.BackendMessage
+	responses [][]byte
 }
 
 func CreateTestWebhook() *TestWebhook {
 	b := TestWebhook{
 		messages:  make(chan backend.BackendMessage, 100),
 		echoStack: echo.New(),
+		responses: make([][]byte, 0),
 	}
 
 	e := b.echoStack
@@ -37,7 +39,14 @@ func (b *TestWebhook) handler(c echo.Context) error {
 	}
 
 	b.messages <- msg
-	c.NoContent(204)
+	if len(b.responses) == 0 {
+		c.NoContent(204)
+	} else {
+		resp := b.responses[0]
+		b.responses = b.responses[1:]
+		c.Blob(200, "text/plain", resp)
+	}
+
 	return nil
 }
 
