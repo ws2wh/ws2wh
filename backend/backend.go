@@ -34,11 +34,11 @@ func (e WsEvent) String() string {
 }
 
 type Backend interface {
-	Send(msg BackendMessage) error
+	Send(msg BackendMessage, callback func([]byte)) error
 }
 
 func CreateBackend(url string) Backend {
-	return &webhook{
+	return &webhookBackend{
 		url:    url,
 		client: http.DefaultClient,
 	}
@@ -55,12 +55,12 @@ type HttpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-type webhook struct {
+type webhookBackend struct {
 	url    string
 	client HttpClient
 }
 
-func (w *webhook) Send(msg BackendMessage) error {
+func (w *webhookBackend) Send(msg BackendMessage, callback func([]byte)) error {
 	req, err := http.NewRequest(http.MethodPost, w.url, bytes.NewReader(msg.Payload))
 	h := http.Header{
 		SessionIdHeader:    {msg.SessionId},
@@ -85,6 +85,15 @@ func (w *webhook) Send(msg BackendMessage) error {
 		}
 
 		return fmt.Errorf("unsuccessful delivery to %s", w.url)
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	if len(body) > 0 {
+		callback(body)
 	}
 
 	return nil

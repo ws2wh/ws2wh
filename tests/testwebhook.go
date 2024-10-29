@@ -69,8 +69,7 @@ func (b *TestWebhook) WaitForMessage(t *testing.T) backend.BackendMessage {
 	case m := <-b.messages:
 		return m
 	case <-ctx.Done():
-		t.Log("Backend didn't receive expected message on time")
-		t.Fail()
+		t.Errorf("test backend should receive websocket message on time")
 		panic("unreachable")
 	}
 }

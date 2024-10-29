@@ -27,42 +27,42 @@ func TestWebsocketToWebhook(t *testing.T) {
 	time.Sleep(time.Millisecond * 10)
 
 	conn, err := websocket.Dial(WsUrl, "", OriginUrl)
-	assert.Nil(err)
+	assert.Nil(err, "should accept websocket connection")
 	onConnected := wh.WaitForMessage(t)
-	assert.NotNil(onConnected)
+	assert.NotNil(onConnected, "received message should not be nil")
 
-	assert.Equal(backend.ClientConnected, onConnected.Event)
+	assert.Equal(backend.ClientConnected, onConnected.Event, "should receive on connected event message")
 	sessionId := onConnected.SessionId
 	replyUrl := onConnected.ReplyChannel
 
 	clientMsg := []byte(uuid.NewString())
 	_, err = conn.Write(clientMsg)
-	assert.Nil(err)
+	assert.Nil(err, "should successfully send websocket message via ws client")
 
 	onMessage := wh.WaitForMessage(t)
-	assert.Equal(sessionId, onMessage.SessionId)
-	assert.Equal(backend.MessageReceived, onMessage.Event)
-	assert.Equal(clientMsg, onMessage.Payload)
+	assert.Equal(sessionId, onMessage.SessionId, "backend should receive message with expected session id")
+	assert.Equal(backend.MessageReceived, onMessage.Event, "backend should receive messagereceived message")
+	assert.Equal(clientMsg, onMessage.Payload, "backend should receive exact same payload as the ws client sent in request body")
 
 	wsClientChan := make(chan []byte, 100)
 	go captureMessage(conn, wsClientChan)
 	expectedBackendMsg := []byte(uuid.NewString())
 	resp, err := http.Post(replyUrl, "text/plain", bytes.NewReader(expectedBackendMsg))
 
-	assert.Nil(err)
-	assert.Less(resp.StatusCode, 300)
-	assert.GreaterOrEqual(resp.StatusCode, 200)
+	assert.Nil(err, "reply url call should not respond with client error")
+	assert.Less(resp.StatusCode, 300, "reply url call should result with successful response")
+	assert.GreaterOrEqual(resp.StatusCode, 200, "reply url call should result with successful response")
 
 	actualBackendMsg := waitForMessage(t, wsClientChan)
 
-	assert.Equal(expectedBackendMsg, actualBackendMsg)
+	assert.Equal(expectedBackendMsg, actualBackendMsg, "reply url call body should be received by websocket client connected to session")
 
 	conn.Close()
 	onClosed := wh.WaitForMessage(t)
-	assert.NotNil(onClosed)
-	assert.Equal(backend.ClientDisconnected, onClosed.Event)
-	assert.Equal(make([]byte, 0), onClosed.Payload)
-	assert.Equal(sessionId, onClosed.SessionId)
+	assert.NotNil(onClosed, "backend should receive non-empty message")
+	assert.Equal(backend.ClientDisconnected, onClosed.Event, "backend received message should have client disconnected event header")
+	assert.Equal(make([]byte, 0), onClosed.Payload, "backend received message should have an empty body")
+	assert.Equal(sessionId, onClosed.SessionId, "backend received message should have proper session id header")
 }
 
 func captureMessage(ws *websocket.Conn, out chan []byte) {
@@ -79,7 +79,7 @@ func waitForMessage(t *testing.T, out chan []byte) []byte {
 	case m := <-out:
 		return m
 	case <-ctx.Done():
-		t.Errorf("Receiving message via ws client timed out")
+		t.Errorf("websocket client should receive backend message on time")
 		panic("unreachable")
 	}
 }

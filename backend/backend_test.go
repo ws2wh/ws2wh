@@ -7,69 +7,108 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWebhookSuccess(t *testing.T) {
 	assert := assert.New(t)
-
-	fc := fakeClient{
+	fc := fakeHttpClient{
 		Responses: []*http.Response{
 			{
 				StatusCode: http.StatusOK,
 				Status:     http.StatusText(200),
+				Body:       io.NopCloser(bytes.NewReader(make([]byte, 0))),
 			},
 		},
 	}
-	wh := webhook{
-		url:    "http://backend/wh",
+	wh := webhookBackend{
+		url:    "http://backend/wh/" + uuid.NewString(),
 		client: &fc,
 	}
-
 	msg := BackendMessage{
-		SessionId:    "ccj12cascdj10c910jc9",
-		ReplyChannel: "http://ws2wh-address/who2033cas",
+		SessionId:    uuid.NewString(),
+		ReplyChannel: "http://ws2wh-address/" + uuid.NewString(),
 		Event:        MessageReceived,
-		Payload:      []byte("HELLO"),
+		Payload:      []byte(uuid.NewString()),
 	}
-	err := wh.Send(msg)
+	cbCount := 0
+
+	err := wh.Send(msg, func(b []byte) { cbCount += 1 })
 
 	assert.Nil(err)
-	assert.Len(fc.Requests, 1)
+	assert.Len(fc.Requests, 1, "should receive 1 request")
+	assert.Zero(cbCount, "should not call the callback (empty wh response body)")
 	req := fc.Requests[0]
 
-	assert.Equal(wh.url, req.URL.String())
-	assert.Equal(msg.SessionId, req.Header.Get(SessionIdHeader))
-	assert.Equal(msg.ReplyChannel, req.Header.Get(ReplyChannelHeader))
-	assert.Equal(MessageReceived.String(), req.Header.Get(EventHeader))
+	assert.Equal(wh.url, req.URL.String(), "should request configured webhook url")
+	assert.Equal(msg.SessionId, req.Header.Get(SessionIdHeader), "request should conain session id header")
+	assert.Equal(msg.ReplyChannel, req.Header.Get(ReplyChannelHeader), "request should contain reply channel header")
+	assert.Equal(MessageReceived.String(), req.Header.Get(EventHeader), "request should contain event name header")
+
 	body, err := io.ReadAll(req.Body)
 	assert.Nil(err)
-	assert.Equal(string(msg.Payload), string(body))
+	assert.Equal(msg.Payload, body, "request body should be same WH message payload")
+}
+
+func TestWebhookSuccessWithPayload(t *testing.T) {
+	assert := assert.New(t)
+	expectedPayload := []byte(uuid.NewString())
+	fc := fakeHttpClient{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Status:     http.StatusText(200),
+				Body:       io.NopCloser(bytes.NewReader(expectedPayload)),
+			},
+		},
+	}
+	wh := webhookBackend{
+		url:    "http://backend/wh/" + uuid.NewString(),
+		client: &fc,
+	}
+	msg := BackendMessage{
+		SessionId:    uuid.NewString(),
+		ReplyChannel: "http://ws2wh-address/" + uuid.NewString(),
+		Event:        MessageReceived,
+		Payload:      []byte(uuid.NewString()),
+	}
+	cbCount := 0
+
+	var actualPayload []byte
+	err := wh.Send(msg, func(b []byte) { cbCount += 1; actualPayload = b })
+
+	assert.Nil(err)
+	assert.Equal(1, cbCount, "should call the callback once")
+	assert.Equal(expectedPayload, actualPayload, "should call the callback with response body payload")
 }
 
 func TestWebhookClientError(t *testing.T) {
 	assert := assert.New(t)
-	fc := fakeClient{
+	fc := fakeHttpClient{
+		// sends error if no responses in the queue
 		Responses: make([]*http.Response, 0),
 	}
-	wh := webhook{
-		url:    "http://backend/wh",
+	wh := webhookBackend{
+		url:    "http://backend/wh/" + uuid.NewString(),
 		client: &fc,
 	}
+	cbCount := 0
 
 	err := wh.Send(BackendMessage{
-		SessionId:    "ccj12cascdj10c910jc9",
-		ReplyChannel: "http://ws2wh-address/who2033cas",
+		SessionId:    uuid.NewString(),
+		ReplyChannel: "http://ws2wh-address/" + uuid.NewString(),
 		Event:        ClientConnected,
-		Payload:      []byte("HELLO"),
-	})
+		Payload:      []byte(uuid.NewString()),
+	}, func(b []byte) { cbCount += 1 })
 
 	assert.NotNil(err)
+	assert.Zero(cbCount, "should not call the callback on client error")
 }
 
 func TestWebhookServiceError(t *testing.T) {
 	assert := assert.New(t)
-	fc := fakeClient{
+	fc := fakeHttpClient{
 		Responses: []*http.Response{
 			{
 				Status:     http.StatusText(http.StatusTooManyRequests),
@@ -78,27 +117,29 @@ func TestWebhookServiceError(t *testing.T) {
 			},
 		},
 	}
-	wh := webhook{
-		url:    "http://backend/wh",
+	wh := webhookBackend{
+		url:    "http://backend/wh/" + uuid.NewString(),
 		client: &fc,
 	}
+	cbCount := 0
 
 	err := wh.Send(BackendMessage{
-		SessionId:    "ccj12cascdj10c910jc9",
-		ReplyChannel: "http://ws2wh-address/who2033cas",
+		SessionId:    uuid.NewString(),
+		ReplyChannel: "http://ws2wh-address/" + uuid.NewString(),
 		Event:        ClientDisconnected,
-		Payload:      []byte("HELLO"),
-	})
+		Payload:      []byte(uuid.NewString()),
+	}, func(b []byte) { cbCount += 1 })
 
 	assert.NotNil(err)
+	assert.Zero(cbCount, "should not call the callback on HTTP error response")
 }
 
-type fakeClient struct {
+type fakeHttpClient struct {
 	Requests  []*http.Request
 	Responses []*http.Response
 }
 
-func (c *fakeClient) Do(req *http.Request) (*http.Response, error) {
+func (c *fakeHttpClient) Do(req *http.Request) (*http.Response, error) {
 	c.Requests = append(c.Requests, req)
 	if len(c.Responses) == 0 {
 		return nil, &url.Error{

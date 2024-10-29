@@ -28,6 +28,12 @@ func (s *Session) Send(message []byte) error {
 
 func (s *Session) RunReceiver() {
 	websocket.Handler(func(ws *websocket.Conn) {
+		callback := func(b []byte) {
+			err := s.Send(b)
+			if err != nil {
+				log.Error(err)
+			}
+		}
 		s.conn = ws
 		b := s.params.Backend
 		msg := backend.BackendMessage{
@@ -36,10 +42,10 @@ func (s *Session) RunReceiver() {
 			Event:        backend.ClientConnected,
 			Payload:      make([]byte, 0),
 		}
-		b.Send(msg)
+		b.Send(msg, callback)
 
 		msg.Event = backend.ClientDisconnected
-		defer b.Send(msg)
+		defer b.Send(msg, func(b []byte) {})
 
 		for {
 			var incomingMsg []byte
@@ -56,7 +62,7 @@ func (s *Session) RunReceiver() {
 				ReplyChannel: s.params.ReplyChannel,
 				Event:        backend.MessageReceived,
 				Payload:      incomingMsg,
-			})
+			}, callback)
 		}
 	}).ServeHTTP(s.params.Response, s.params.Request)
 }
