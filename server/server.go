@@ -37,7 +37,7 @@ func CreateServer(frontendAddr string, backendUrl string) *Server {
 	// should we recover from panic?
 	e.Use(middleware.Recover())
 	e.GET("/", s.handle)
-	e.POST("/:id", s.send)
+	e.POST("/reply/:id", s.send)
 
 	s.echoStack = e
 
@@ -60,7 +60,7 @@ func (s *Server) handle(c echo.Context) error {
 	s.sessions[id] = session.NewSession(session.SessionParams{
 		Id:           id,
 		Backend:      s.DefaultBackend,
-		ReplyChannel: fmt.Sprintf("%s://%s/%s", c.Scheme(), c.Request().Host, id),
+		ReplyChannel: fmt.Sprintf("%s://%s/reply/%s", c.Scheme(), c.Request().Host, id),
 		Response:     c.Response().Writer,
 		Request:      c.Request(),
 	})

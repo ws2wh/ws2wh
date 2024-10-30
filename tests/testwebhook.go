@@ -34,7 +34,7 @@ func (b *TestWebhook) handler(c echo.Context) error {
 	msg := backend.BackendMessage{
 		SessionId:    c.Request().Header.Get(backend.SessionIdHeader),
 		ReplyChannel: c.Request().Header.Get(backend.ReplyChannelHeader),
-		Event:        toWsEvent(c.Request().Header.Get(backend.EventHeader)),
+		Event:        backend.ParseWsEvent(c.Request().Header.Get(backend.EventHeader)),
 		Payload:      p,
 	}
 
@@ -48,19 +48,6 @@ func (b *TestWebhook) handler(c echo.Context) error {
 	}
 
 	return nil
-}
-
-func toWsEvent(v string) backend.WsEvent {
-	switch v {
-	case "ClientConnected":
-		return backend.ClientConnected
-	case "MessageReceived":
-		return backend.MessageReceived
-	case "ClientDisconnected":
-		return backend.ClientDisconnected
-	default:
-		return backend.WsEvent(0)
-	}
 }
 
 func (b *TestWebhook) Start() {

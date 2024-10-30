@@ -23,13 +23,26 @@ const (
 func (e WsEvent) String() string {
 	switch e {
 	case ClientConnected:
-		return "ClientConnected"
+		return "client-connected"
 	case MessageReceived:
-		return "MessageReceived"
+		return "message-received"
 	case ClientDisconnected:
-		return "ClientDisconnected"
+		return "client-disconnected"
 	default:
-		return "Uknown"
+		return "unknown"
+	}
+}
+
+func ParseWsEvent(e string) WsEvent {
+	switch e {
+	case "client-connected":
+		return ClientConnected
+	case "message-received":
+		return MessageReceived
+	case "client-disconnected":
+		return ClientDisconnected
+	default:
+		return Unknown
 	}
 }
 
