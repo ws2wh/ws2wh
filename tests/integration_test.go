@@ -30,6 +30,9 @@ func TestWebsocketToWebhook(t *testing.T) {
 	backendMessageSent(conn, replyUrl, t)
 	websocketClientMessageWithImmediateBackendResponse(conn, wh, sessionId, t)
 	websocketClientDisconnected(conn, wh, sessionId, t)
+
+	conn, _, replyUrl = clientConnected(wh, t)
+	sessionTerminatedByBackend(conn, replyUrl, t)
 }
 
 func clientConnected(wh *TestWebhook, t *testing.T) (conn *websocket.Conn, sessionId string, replyUrl string) {
@@ -100,6 +103,32 @@ func websocketClientDisconnected(conn *websocket.Conn, wh *TestWebhook, sessionI
 	assert.Equal(backend.ClientDisconnected, onClosed.Event, "backend received message should have client disconnected event header")
 	assert.Equal(make([]byte, 0), onClosed.Payload, "backend received message should have an empty body")
 	assert.Equal(sessionId, onClosed.SessionId, "backend received message should have proper session id header")
+}
+
+func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testing.T) {
+	assert := assert.New(t)
+
+	wsClientChan := make(chan []byte, 1)
+	defer close(wsClientChan)
+	go captureMessage(conn, wsClientChan)
+	expectedGoodbyeMessage := []byte(uuid.NewString())
+
+	req, _ := http.NewRequest(http.MethodPost, replyUrl, bytes.NewReader([]byte(expectedGoodbyeMessage)))
+
+	req.Header = http.Header{
+		backend.CommandHeader: {backend.TerminateSessionCommand},
+	}
+
+	r, e := http.DefaultClient.Do(req)
+	assert.Nil(e, "backend should not get an http client error on calling reply url")
+	assert.Equal(http.StatusOK, r.StatusCode, "backend should receive 200 on sending to reply url")
+
+	actualGoodbyeMessage := waitForMessage(t, wsClientChan)
+	assert.Equal(expectedGoodbyeMessage, actualGoodbyeMessage)
+
+	err := websocket.Message.Send(conn, "anything")
+	assert.NotNil(err, "websocket client should fail on sending message")
+	assert.Equal("EOF", err.Error())
 }
 
 func captureMessage(ws *websocket.Conn, out chan []byte) {

@@ -80,7 +80,14 @@ func (s *Server) send(c echo.Context) error {
 		c.JSON(http.StatusNotFound, SessionResponse{Success: false, Message: "NOT_FOUND"})
 	}
 
-	session.Send(body)
+	if len(body) > 0 {
+		session.Send(body)
+	}
+
+	if c.Request().Header.Get(backend.CommandHeader) == backend.TerminateSessionCommand {
+		err := session.Close()
+		c.Logger().Fatal(err)
+	}
 
 	return c.JSON(http.StatusOK, SessionResponse{Success: true})
 }

@@ -10,6 +10,10 @@ import (
 const SessionIdHeader = "Ws-Session-Id"
 const ReplyChannelHeader = "Ws-Reply-Channel"
 const EventHeader = "Ws-Event"
+const CommandHeader = "Ws-Command"
+
+const SendMessageCommand = "send-message"
+const TerminateSessionCommand = "terminate-session"
 
 type WsEvent int
 
@@ -47,7 +51,7 @@ func ParseWsEvent(e string) WsEvent {
 }
 
 type Backend interface {
-	Send(msg BackendMessage, callback func([]byte)) error
+	Send(msg BackendMessage, session SessionHandle) error
 }
 
 func CreateBackend(url string) Backend {
@@ -73,7 +77,7 @@ type webhookBackend struct {
 	client HttpClient
 }
 
-func (w *webhookBackend) Send(msg BackendMessage, callback func([]byte)) error {
+func (w *webhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 	req, err := http.NewRequest(http.MethodPost, w.url, bytes.NewReader(msg.Payload))
 	h := http.Header{
 		SessionIdHeader:    {msg.SessionId},
@@ -106,8 +110,16 @@ func (w *webhookBackend) Send(msg BackendMessage, callback func([]byte)) error {
 	}
 
 	if len(body) > 0 && msg.Event != ClientDisconnected {
-		callback(body)
+		session.Send(body)
 	}
 
+	if res.Header.Get(CommandHeader) == TerminateSessionCommand {
+		session.Close()
+	}
 	return nil
+}
+
+type SessionHandle interface {
+	Send(message []byte) error
+	Close() error
 }

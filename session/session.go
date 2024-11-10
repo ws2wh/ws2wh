@@ -26,14 +26,13 @@ func (s *Session) Send(message []byte) error {
 	return e
 }
 
+func (s *Session) Close() error {
+	// TODO: this doesn't work - consider replacing with gorilla websocket
+	return s.conn.Close()
+}
+
 func (s *Session) RunReceiver() {
 	websocket.Handler(func(ws *websocket.Conn) {
-		callback := func(b []byte) {
-			err := s.Send(b)
-			if err != nil {
-				log.Error(err)
-			}
-		}
 		s.conn = ws
 		b := s.params.Backend
 		msg := backend.BackendMessage{
@@ -42,10 +41,11 @@ func (s *Session) RunReceiver() {
 			Event:        backend.ClientConnected,
 			Payload:      make([]byte, 0),
 		}
-		b.Send(msg, callback)
+
+		b.Send(msg, s)
 
 		msg.Event = backend.ClientDisconnected
-		defer b.Send(msg, func(b []byte) {})
+		defer b.Send(msg, s)
 
 		for {
 			var incomingMsg []byte
@@ -62,7 +62,7 @@ func (s *Session) RunReceiver() {
 				ReplyChannel: s.params.ReplyChannel,
 				Event:        backend.MessageReceived,
 				Payload:      incomingMsg,
-			}, callback)
+			}, s)
 		}
 	}).ServeHTTP(s.params.Response, s.params.Request)
 }
