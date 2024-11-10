@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"github.com/pmartynski/ws2wh/backend"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/websocket"
 )
 
 func TestWebsocketToWebhook(t *testing.T) {
@@ -38,7 +38,7 @@ func TestWebsocketToWebhook(t *testing.T) {
 func clientConnected(wh *TestWebhook, t *testing.T) (conn *websocket.Conn, sessionId string, replyUrl string) {
 	assert := assert.New(t)
 
-	conn, err := websocket.Dial(WsUrl, "", OriginUrl)
+	conn, _, err := websocket.DefaultDialer.Dial(WsUrl, nil)
 	assert.Nil(err, "should accept websocket connection")
 	onConnected := wh.WaitForMessage(t)
 	assert.NotNil(onConnected, "received message should not be nil")
@@ -53,7 +53,7 @@ func websocketClientMessageSent(conn *websocket.Conn, wh *TestWebhook, sessionId
 	assert := assert.New(t)
 
 	clientMsg := []byte(uuid.NewString())
-	_, err := conn.Write(clientMsg)
+	err := conn.WriteMessage(websocket.TextMessage, clientMsg)
 	assert.Nil(err, "should successfully send websocket message via ws client")
 
 	onMessage := wh.WaitForMessage(t)
@@ -108,9 +108,6 @@ func websocketClientDisconnected(conn *websocket.Conn, wh *TestWebhook, sessionI
 func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testing.T) {
 	assert := assert.New(t)
 
-	wsClientChan := make(chan []byte, 1)
-	defer close(wsClientChan)
-	go captureMessage(conn, wsClientChan)
 	expectedGoodbyeMessage := []byte(uuid.NewString())
 
 	req, _ := http.NewRequest(http.MethodPost, replyUrl, bytes.NewReader([]byte(expectedGoodbyeMessage)))
@@ -119,21 +116,36 @@ func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testin
 		backend.CommandHeader: {backend.TerminateSessionCommand},
 	}
 
+	messageType := make(chan int, 1)
+	messageData := make(chan []byte, 1)
+	var closed bool
+
+	go func() {
+		for {
+			mt, d, err := conn.ReadMessage()
+			if err != nil {
+				break
+			}
+			messageType <- mt
+			messageData <- d
+		}
+
+		closed = true
+	}()
+
 	r, e := http.DefaultClient.Do(req)
 	assert.Nil(e, "backend should not get an http client error on calling reply url")
 	assert.Equal(http.StatusOK, r.StatusCode, "backend should receive 200 on sending to reply url")
 
-	actualGoodbyeMessage := waitForMessage(t, wsClientChan)
+	mt := <-messageType
+	actualGoodbyeMessage := <-messageData
+	assert.Equal(websocket.TextMessage, mt)
 	assert.Equal(expectedGoodbyeMessage, actualGoodbyeMessage)
-
-	err := websocket.Message.Send(conn, "anything")
-	assert.NotNil(err, "websocket client should fail on sending message")
-	assert.Equal("EOF", err.Error())
+	assert.True(closed)
 }
 
 func captureMessage(ws *websocket.Conn, out chan []byte) {
-	var incomingMsg []byte
-	websocket.Message.Receive(ws, &incomingMsg)
+	_, incomingMsg, _ := ws.ReadMessage()
 	out <- incomingMsg
 }
 

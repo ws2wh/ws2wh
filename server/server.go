@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
 	"github.com/pmartynski/ws2wh/backend"
+	"github.com/pmartynski/ws2wh/frontend"
 	"github.com/pmartynski/ws2wh/session"
 )
 
@@ -56,19 +57,19 @@ func (s *Server) Stop() {
 
 func (s *Server) handle(c echo.Context) error {
 	id := uuid.NewString()
+	handler := frontend.NewWsHandler()
 
 	s.sessions[id] = session.NewSession(session.SessionParams{
 		Id:           id,
 		Backend:      s.DefaultBackend,
 		ReplyChannel: fmt.Sprintf("%s://%s/reply/%s", c.Scheme(), c.Request().Host, id),
-		// TODO: create handler using gorilla websocket
-		Connection: nil,
-		// Response:     c.Response().Writer,
-		// Request:      c.Request(),
+		Connection:   handler,
 	})
+
 	defer delete(s.sessions, id)
 
-	s.sessions[id].Receive()
+	go s.sessions[id].Receive()
+	handler.Handle(c.Response().Writer, c.Request(), c.Response().Header())
 	return nil
 }
 
@@ -88,7 +89,10 @@ func (s *Server) send(c echo.Context) error {
 
 	if c.Request().Header.Get(backend.CommandHeader) == backend.TerminateSessionCommand {
 		err := session.Close()
-		c.Logger().Fatal(err)
+
+		if err != nil {
+			c.Logger().Error(err)
+		}
 	}
 
 	return c.JSON(http.StatusOK, SessionResponse{Success: true})

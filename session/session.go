@@ -57,7 +57,7 @@ loop:
 type WebsocketConn interface {
 	Send(payload []byte) error
 	Receiver() <-chan []byte
-	Done() chan struct{}
+	Done() chan interface{}
 	Close() error
 }
 
