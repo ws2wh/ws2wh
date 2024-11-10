@@ -61,12 +61,14 @@ func (s *Server) handle(c echo.Context) error {
 		Id:           id,
 		Backend:      s.DefaultBackend,
 		ReplyChannel: fmt.Sprintf("%s://%s/reply/%s", c.Scheme(), c.Request().Host, id),
-		Response:     c.Response().Writer,
-		Request:      c.Request(),
+		// TODO: create handler using gorilla websocket
+		Connection: nil,
+		// Response:     c.Response().Writer,
+		// Request:      c.Request(),
 	})
 	defer delete(s.sessions, id)
 
-	s.sessions[id].RunReceiver()
+	s.sessions[id].Receive()
 	return nil
 }
 
