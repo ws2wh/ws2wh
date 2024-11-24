@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -23,7 +24,12 @@ type Server struct {
 	echoStack      *echo.Echo
 }
 
-func CreateServer(frontendAddr string, backendUrl string) *Server {
+func CreateServer(
+	frontendAddr string,
+	websocketPath string,
+	backendUrl string,
+	replyPathPrefix string) *Server {
+
 	s := Server{
 		frontendAddr: frontendAddr,
 		backendUrl:   backendUrl,
@@ -31,16 +37,21 @@ func CreateServer(frontendAddr string, backendUrl string) *Server {
 	}
 	s.DefaultBackend = backend.CreateBackend(backendUrl)
 
-	e := echo.New()
-	e.Use(middleware.Logger())
-	e.Logger.SetLevel(log.DEBUG)
+	es := echo.New()
+	es.Use(middleware.Logger())
+	es.Logger.SetLevel(log.DEBUG)
+	es.HideBanner = true
 
 	// should we recover from panic?
-	e.Use(middleware.Recover())
-	e.GET("/", s.handle)
-	e.POST("/reply/:id", s.send)
+	es.Use(middleware.Recover())
 
-	s.echoStack = e
+	replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(replyPathPrefix, "/"))
+	es.GET(websocketPath, s.handle)
+	es.POST(replyPath, s.send)
+
+	s.echoStack = es
+	fmt.Printf("⇨ backend action: POST %s\n", backendUrl)
+	fmt.Printf("⇨ websocket upgrade path: %s\n", websocketPath)
 
 	return &s
 }

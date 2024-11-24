@@ -2,23 +2,31 @@ package main
 
 import (
 	"flag"
-	"log"
+	"fmt"
 	"net/url"
+	"os"
 
 	"github.com/pmartynski/ws2wh/server"
 )
 
 func main() {
-	frontAddr := flag.String("f", ":3000", "Websocket frontend listener address")
-	backUrl := flag.String("b", "", "Required: Webhook backend URL (must accept POST)")
+	backendUrl := flag.String("b", "", "Required - Webhook backend URL (must accept POST)")
+	replyPathPrefix := flag.String("r", "/reply", "Backend reply path prefix")
+	websocketListener := flag.String("l", ":3000", "Websocket frontend listener address")
+	websocketPath := flag.String("p", "/", "Websocket upgrade path")
+
 	flag.Parse()
-	if *backUrl == "" {
-		log.Fatalf("Webhook backend URL is required")
+	if *backendUrl == "" {
+		flag.CommandLine.Usage()
+		fmt.Printf("Webhook backend URL is required\n")
+		os.Exit(1)
 	}
-	_, e := url.Parse(*backUrl)
+	_, e := url.Parse(*backendUrl)
 	if e != nil {
-		log.Fatalf("Invalid backend URL: %s, err: %s", *backUrl, e)
+		flag.CommandLine.Usage()
+		fmt.Printf("Invalid backend URL: %s, err: %s\n", *backendUrl, e)
+		os.Exit(1)
 	}
 
-	server.CreateServer(*frontAddr, *backUrl).Start()
+	server.CreateServer(*websocketListener, *websocketPath, *backendUrl, *replyPathPrefix).Start()
 }
