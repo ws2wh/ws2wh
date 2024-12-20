@@ -22,7 +22,7 @@ func TestWebhookSuccess(t *testing.T) {
 			},
 		},
 	}
-	wh := webhookBackend{
+	wh := WebhookBackend{
 		url:    "http://backend/wh/" + uuid.NewString(),
 		client: &fc,
 	}
@@ -65,7 +65,7 @@ func TestWebhookSuccessWithPayload(t *testing.T) {
 			},
 		},
 	}
-	wh := webhookBackend{
+	wh := WebhookBackend{
 		url:    "http://backend/wh/" + uuid.NewString(),
 		client: &fc,
 	}
@@ -93,7 +93,7 @@ func TestWebhookClientError(t *testing.T) {
 		// sends error if no responses in the queue
 		Responses: make([]*http.Response, 0),
 	}
-	wh := webhookBackend{
+	wh := WebhookBackend{
 		url:    "http://backend/wh/" + uuid.NewString(),
 		client: &fc,
 	}
@@ -121,7 +121,7 @@ func TestWebhookServiceError(t *testing.T) {
 			},
 		},
 	}
-	wh := webhookBackend{
+	wh := WebhookBackend{
 		url:    "http://backend/wh/" + uuid.NewString(),
 		client: &fc,
 	}
