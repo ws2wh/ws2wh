@@ -8,11 +8,24 @@ WS2WH is a lightweight bridge that connects WebSocket clients to HTTP webhook en
 ws2wh -b https://example.com/api/v1/webhook -r /reply -l :3000 -p /
 ```
 
-Parameters:
-- `-b` (required) - Webhook backend URL that will receive POST requests from the relay
-- `-r` (default: "/reply") - Path prefix for backend replies
-- `-l` (default: ":3000") - Address and port for the WebSocket server to listen on
-- `-p` (default: "/") - Path where WebSocket connections will be upgraded
+Parameters can be provided either as command-line flags or environment variables:
+
+| Flag | Environment Variable | Default | Description |
+|-|-|-|-|
+| `-b` | `BACKEND_URL` | (required) | Webhook backend URL that will receive POST requests from the relay |
+| `-r` | `REPLY_PATH_PREFIX` | `/reply` | Path prefix for backend replies |
+| `-l` | `WS_PORT` | `:3000` | Address and port for the WebSocket server to listen on |
+| `-p` | `WS_PATH` | `/` | Path where WebSocket connections will be upgraded |
+
+Example using environment variables:
+
+```bash
+export BACKEND_URL=https://example.com/api/v1/webhook
+export REPLY_PATH_PREFIX=/reply
+export WS_PORT=3000
+export WS_PATH=/
+ws2wh
+```
 
 ## How it works
 
