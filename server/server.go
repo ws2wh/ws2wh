@@ -1,3 +1,4 @@
+// Package server provides the HTTP and WebSocket server implementation for ws2wh
 package server
 
 import (
@@ -16,6 +17,7 @@ import (
 	"github.com/pmartynski/ws2wh/session"
 )
 
+// Server handles WebSocket connections and forwards messages to a configured backend
 type Server struct {
 	DefaultBackend backend.Backend
 	frontendAddr   string
@@ -24,6 +26,15 @@ type Server struct {
 	echoStack      *echo.Echo
 }
 
+// CreateServer initializes a new Server instance with the given configuration
+//
+// Parameters:
+//   - frontendAddr: The address and port to listen on (e.g. ":3000")
+//   - websocketPath: The path where WebSocket connections will be upgraded (e.g. "/ws")
+//   - backendUrl: The URL where backend messages will be sent
+//   - replyPathPrefix: The prefix for reply endpoints (e.g. "/reply")
+//
+// Returns a configured Server instance ready to be started
 func CreateServer(
 	frontendAddr string,
 	websocketPath string,
@@ -56,12 +67,14 @@ func CreateServer(
 	return &s
 }
 
+// Start begins listening for connections on the configured address
 func (s *Server) Start() {
 	log.SetLevel(log.DEBUG)
 	e := s.echoStack
 	e.Logger.Info(e.Start(s.frontendAddr))
 }
 
+// Stop gracefully shuts down the server
 func (s *Server) Stop() {
 	s.echoStack.Shutdown(context.Background())
 }
@@ -109,6 +122,7 @@ func (s *Server) send(c echo.Context) error {
 	return c.JSON(http.StatusOK, SessionResponse{Success: true})
 }
 
+// SessionResponse represents the JSON response format for session-related operations
 type SessionResponse struct {
 	Success bool        `json:"success"`
 	Message interface{} `json:"message,omitempty"`

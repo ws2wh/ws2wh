@@ -9,6 +9,12 @@ import (
 	"github.com/pmartynski/ws2wh/server"
 )
 
+// main starts the WS2WH server with configuration from flags or environment variables
+// Flags:
+// -b, BACKEND_URL: Required - Webhook backend URL that will receive POST requests
+// -r, REPLY_PATH_PREFIX: Path prefix for backend replies (default: /reply)
+// -l, WS_PORT: Address and port for WebSocket server to listen on (default: :3000)
+// -p, WS_PATH: Path where WebSocket connections will be upgraded (default: /)
 func main() {
 	backendUrl := flag.String("b", getEnvOrDefault("BACKEND_URL", ""), "Required - Webhook backend URL (must accept POST)")
 	replyPathPrefix := flag.String("r", getEnvOrDefault("REPLY_PATH_PREFIX", "/reply"), "Backend reply path prefix")
