@@ -10,10 +10,10 @@ import (
 )
 
 func main() {
-	backendUrl := flag.String("b", "", "Required - Webhook backend URL (must accept POST)")
-	replyPathPrefix := flag.String("r", "/reply", "Backend reply path prefix")
-	websocketListener := flag.String("l", ":3000", "Websocket frontend listener address")
-	websocketPath := flag.String("p", "/", "Websocket upgrade path")
+	backendUrl := flag.String("b", getEnvOrDefault("BACKEND_URL", ""), "Required - Webhook backend URL (must accept POST)")
+	replyPathPrefix := flag.String("r", getEnvOrDefault("REPLY_PATH_PREFIX", "/reply"), "Backend reply path prefix")
+	websocketListener := flag.String("l", fmt.Sprintf(":%s", getEnvOrDefault("WS_PORT", "3000")), "Websocket frontend listener address")
+	websocketPath := flag.String("p", getEnvOrDefault("WS_PATH", "/"), "Websocket upgrade path")
 
 	flag.Parse()
 	if *backendUrl == "" {
@@ -29,4 +29,11 @@ func main() {
 	}
 
 	server.CreateServer(*websocketListener, *websocketPath, *backendUrl, *replyPathPrefix).Start()
+}
+
+func getEnvOrDefault(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }
