@@ -1,3 +1,4 @@
+// Package tests provides integration tests for the ws2wh server
 package tests
 
 import (
@@ -13,6 +14,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestWebsocketToWebhook tests the full flow of WebSocket to webhook communication:
+// 1. Client connects via WebSocket
+// 2. Client sends a message that gets forwarded to webhook
+// 3. Backend sends a message back via reply URL
+// 4. Client sends a message and gets immediate response from backend
+// 5. Client disconnects and backend is notified
+// 6. New client connects and backend terminates the session
 func TestWebsocketToWebhook(t *testing.T) {
 	wsSrv := CreateTestWs()
 	wsSrv.Start()
@@ -35,6 +43,8 @@ func TestWebsocketToWebhook(t *testing.T) {
 	sessionTerminatedByBackend(conn, replyUrl, t)
 }
 
+// clientConnected establishes a WebSocket connection and verifies the backend
+// receives the connection event with proper session ID and reply URL
 func clientConnected(wh *TestWebhook, t *testing.T) (conn *websocket.Conn, sessionId string, replyUrl string) {
 	assert := assert.New(t)
 
@@ -49,6 +59,8 @@ func clientConnected(wh *TestWebhook, t *testing.T) (conn *websocket.Conn, sessi
 	return
 }
 
+// websocketClientMessageSent tests sending a message from WebSocket client
+// and verifies it is properly forwarded to the backend webhook
 func websocketClientMessageSent(conn *websocket.Conn, wh *TestWebhook, sessionId string, t *testing.T) {
 	assert := assert.New(t)
 
@@ -62,6 +74,8 @@ func websocketClientMessageSent(conn *websocket.Conn, wh *TestWebhook, sessionId
 	assert.Equal(clientMsg, onMessage.Payload, "backend should receive exact same payload as the ws client sent in request body")
 }
 
+// backendMessageSent tests sending a message from the backend via reply URL
+// and verifies it is properly forwarded to the WebSocket client
 func backendMessageSent(conn *websocket.Conn, replyUrl string, t *testing.T) {
 	assert := assert.New(t)
 
@@ -81,6 +95,8 @@ func backendMessageSent(conn *websocket.Conn, replyUrl string, t *testing.T) {
 	assert.Equal(expectedBackendMsg, actualBackendMsg, "reply url call body should be received by websocket client connected to session")
 }
 
+// websocketClientMessageWithImmediateBackendResponse tests the flow where backend
+// responds immediately to a client message with a pre-configured response
 func websocketClientMessageWithImmediateBackendResponse(conn *websocket.Conn, wh *TestWebhook, sessionId string, t *testing.T) {
 	assert := assert.New(t)
 	expectedResponse := []byte(uuid.NewString())
@@ -93,6 +109,8 @@ func websocketClientMessageWithImmediateBackendResponse(conn *websocket.Conn, wh
 	assert.Equal(expectedResponse, actualResponse, "immediate backend response body should be received by websocket client connected to session")
 }
 
+// websocketClientDisconnected tests client disconnection and verifies
+// the backend receives proper disconnection notification
 func websocketClientDisconnected(conn *websocket.Conn, wh *TestWebhook, sessionId string, t *testing.T) {
 	assert := assert.New(t)
 
@@ -105,6 +123,8 @@ func websocketClientDisconnected(conn *websocket.Conn, wh *TestWebhook, sessionI
 	assert.Equal(sessionId, onClosed.SessionId, "backend received message should have proper session id header")
 }
 
+// sessionTerminatedByBackend tests the backend's ability to terminate a WebSocket session
+// by sending a terminate command via the reply URL
 func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testing.T) {
 	assert := assert.New(t)
 
@@ -144,11 +164,15 @@ func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testin
 	assert.True(closed)
 }
 
+// captureMessage reads a single message from the WebSocket connection
+// and sends it to the output channel
 func captureMessage(ws *websocket.Conn, out chan []byte) {
 	_, incomingMsg, _ := ws.ReadMessage()
 	out <- incomingMsg
 }
 
+// waitForMessage waits up to 1 second for a message on the channel
+// and returns it, or fails the test if timeout occurs
 func waitForMessage(t *testing.T, out chan []byte) []byte {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 	defer cancel()
