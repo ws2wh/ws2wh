@@ -1,3 +1,6 @@
+// Package frontend provides WebSocket connection handling functionality for ws2wh.
+// It implements the WebSocket server-side logic for upgrading HTTP connections,
+// managing message channels, and handling the WebSocket connection lifecycle.
 package frontend
 
 import (

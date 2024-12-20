@@ -1,3 +1,6 @@
+// Package session provides functionality for managing WebSocket sessions in ws2wh.
+// It handles the lifecycle of WebSocket connections, message routing between clients
+// and the backend service, and session state management.
 package session
 
 import (

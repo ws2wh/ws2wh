@@ -1,3 +1,5 @@
+// Package backend provides functionality for handling WebSocket messages and forwarding them to webhook endpoints.
+// It defines constants and types for managing WebSocket sessions, events, and commands between the server and clients.
 package backend
 
 import (
