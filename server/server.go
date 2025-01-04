@@ -75,7 +75,7 @@ func CreateServer(
 // Start begins listening for connections on the configured address
 func (s *Server) Start() {
 	e := s.echoStack
-	e.Logger.Fatalj(map[string]interface{}{
+	e.Logger.Errorj(map[string]interface{}{
 		"error": e.Start(s.frontendAddr),
 	})
 }

@@ -3,6 +3,7 @@ package session
 import (
 	"testing"
 
+	"github.com/labstack/gommon/log"
 	"github.com/pmartynski/ws2wh/backend"
 	"github.com/stretchr/testify/assert"
 )
@@ -71,7 +72,7 @@ func TestNewSession(t *testing.T) {
 
 func TestSession_Send(t *testing.T) {
 	conn := NewMockWebsocketConn()
-	session := &Session{Connection: conn}
+	session := &Session{Connection: conn, Logger: log.New("test")}
 
 	message := []byte("test message")
 	err := session.Send(message)
@@ -82,7 +83,7 @@ func TestSession_Send(t *testing.T) {
 
 func TestSession_Close(t *testing.T) {
 	conn := NewMockWebsocketConn()
-	session := &Session{Connection: conn}
+	session := &Session{Connection: conn, Logger: log.New("test")}
 
 	err := session.Close()
 
@@ -98,6 +99,7 @@ func TestSession_Receive(t *testing.T) {
 		ReplyChannel: "http://test.com/reply",
 		Backend:      mockBackend,
 		Connection:   conn,
+		Logger:       log.New("test"),
 	}
 
 	// Test connection message
