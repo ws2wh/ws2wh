@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 
@@ -20,21 +21,18 @@ func main() {
 	replyPathPrefix := flag.String("r", getEnvOrDefault("REPLY_PATH_PREFIX", "/reply"), "Backend reply path prefix")
 	websocketListener := flag.String("l", fmt.Sprintf(":%s", getEnvOrDefault("WS_PORT", "3000")), "Websocket frontend listener address")
 	websocketPath := flag.String("p", getEnvOrDefault("WS_PATH", "/"), "Websocket upgrade path")
+	logLevel := flag.String("v", getEnvOrDefault("LOG_LEVEL", "INFO"), "Log level (DEBUG,	INFO, WARN, ERROR, OFF; default: INFO)")
 
 	flag.Parse()
 	if *backendUrl == "" {
-		flag.CommandLine.Usage()
-		fmt.Printf("Webhook backend URL is required\n")
-		os.Exit(1)
+		log.Fatalf("Webhook backend URL is required")
 	}
-	_, e := url.Parse(*backendUrl)
+	_, e := url.ParseRequestURI(*backendUrl)
 	if e != nil {
-		flag.CommandLine.Usage()
-		fmt.Printf("Invalid backend URL: %s, err: %s\n", *backendUrl, e)
-		os.Exit(1)
+		log.Fatalf("Invalid backend URL: %s", *backendUrl)
 	}
 
-	server.CreateServer(*websocketListener, *websocketPath, *backendUrl, *replyPathPrefix).Start()
+	server.CreateServer(*websocketListener, *websocketPath, *backendUrl, *replyPathPrefix, *logLevel).Start()
 }
 
 func getEnvOrDefault(key, fallback string) string {
