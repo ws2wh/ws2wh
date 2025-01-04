@@ -158,11 +158,17 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 	}
 
 	if len(body) > 0 && msg.Event != ClientDisconnected {
-		session.Send(body)
+		err = session.Send(body)
+		if err != nil {
+			return err
+		}
 	}
 
 	if res.Header.Get(CommandHeader) == TerminateSessionCommand {
-		session.Close()
+		err = session.Close()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

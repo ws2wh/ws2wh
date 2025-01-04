@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/labstack/echo/v4"
 )
 
 var upgrader = websocket.Upgrader{
@@ -15,10 +16,12 @@ var upgrader = websocket.Upgrader{
 
 // NewWsHandler creates a new WebsocketHandler with initialized channels
 // for receiving messages and handling connection termination
-func NewWsHandler() *WebsocketHandler {
+func NewWsHandler(logger echo.Logger, id string) *WebsocketHandler {
 	h := WebsocketHandler{
 		receiverChannel: make(chan []byte, 64),
 		doneChannel:     make(chan interface{}, 1),
+		logger:          logger,
+		sessionId:       id,
 	}
 
 	return &h
@@ -30,12 +33,13 @@ type WebsocketHandler struct {
 	receiverChannel chan []byte
 	doneChannel     chan interface{}
 	conn            *websocket.Conn
+	logger          echo.Logger
+	sessionId       string
 }
 
 // Send writes a message to the WebSocket connection
 func (h *WebsocketHandler) Send(data []byte) error {
-	h.conn.WriteMessage(websocket.TextMessage, data)
-	return nil
+	return h.conn.WriteMessage(websocket.TextMessage, data)
 }
 
 // Receiver returns a channel for receiving incoming WebSocket messages
@@ -51,10 +55,12 @@ func (h *WebsocketHandler) Done() chan interface{} {
 // Close gracefully terminates the WebSocket connection
 func (h *WebsocketHandler) Close() error {
 	h.doneChannel <- 1
-	h.conn.WriteMessage(websocket.CloseMessage, make([]byte, 0))
-	defer h.conn.Close()
+	err := h.conn.WriteMessage(websocket.CloseMessage, make([]byte, 0))
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return h.conn.Close()
 }
 
 // Handle upgrades an HTTP connection to WebSocket and manages the connection lifecycle.
@@ -64,8 +70,17 @@ func (h *WebsocketHandler) Handle(w http.ResponseWriter, r *http.Request, respon
 	defer close(h.doneChannel)
 	defer close(h.receiverChannel)
 
+	h.logger.Infoj(map[string]interface{}{
+		"message":   "Upgrading HTTP to WS",
+		"sessionId": h.sessionId,
+	})
 	conn, err := upgrader.Upgrade(w, r, responseHeader)
 	if err != nil {
+		h.logger.Errorj(map[string]interface{}{
+			"message":   "Error while upgrading connection",
+			"sessionId": h.sessionId,
+			"error":     err,
+		})
 		return err
 	}
 
@@ -73,15 +88,29 @@ func (h *WebsocketHandler) Handle(w http.ResponseWriter, r *http.Request, respon
 	for {
 		_, msg, err := conn.ReadMessage()
 		if websocket.IsCloseError(err) {
+			h.logger.Infoj(map[string]interface{}{
+				"message":   "Closing connection",
+				"sessionId": h.sessionId,
+			})
 			h.doneChannel <- 1
 			return nil
 		}
 
 		if err != nil {
+			h.logger.Errorj(map[string]interface{}{
+				"message":   "Error while reading message",
+				"sessionId": h.sessionId,
+				"error":     err,
+			})
 			h.doneChannel <- 1
 			return err
 		}
 
+		h.logger.Debugj(map[string]interface{}{
+			"message":   "Received message",
+			"sessionId": h.sessionId,
+			"data":      string(msg),
+		})
 		h.receiverChannel <- msg
 	}
 }

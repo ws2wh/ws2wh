@@ -4,6 +4,7 @@
 package session
 
 import (
+	"github.com/labstack/echo/v4"
 	"github.com/pmartynski/ws2wh/backend"
 )
 
@@ -17,6 +18,8 @@ type Session struct {
 	Backend backend.Backend
 	// Connection manages the WebSocket connection with the client
 	Connection WebsocketConn
+	// Session logger
+	Logger echo.Logger
 }
 
 // NewSession creates a new WebSocket session with the provided parameters
@@ -36,12 +39,21 @@ func NewSession(params SessionParams) *Session {
 // message contains the raw bytes to send to the client
 // Returns an error if sending the message fails
 func (s *Session) Send(message []byte) error {
+	s.Logger.Debugj(map[string]interface{}{
+		"message":   "Sending message to client",
+		"sessionId": s.Id,
+		"payload":   string(message),
+	})
 	return s.Connection.Send(message)
 }
 
 // Close terminates the WebSocket connection for this session
 // Returns an error if closing the connection fails
 func (s *Session) Close() error {
+	s.Logger.Debugj(map[string]interface{}{
+		"message":   "Closing WebSocket connection",
+		"sessionId": s.Id,
+	})
 	return s.Connection.Close()
 }
 
@@ -52,6 +64,10 @@ func (s *Session) Close() error {
 // - Notifies the backend when the client disconnects
 // - Cleans up the session when done
 func (s *Session) Receive() {
+	s.Logger.Infoj(map[string]interface{}{
+		"message":   "Starting WebSocket session",
+		"sessionId": s.Id,
+	})
 
 	msg := backend.BackendMessage{
 		SessionId:    s.Id,
@@ -60,21 +76,57 @@ func (s *Session) Receive() {
 		Payload:      make([]byte, 0),
 	}
 
-	s.Backend.Send(msg, s)
+	err := s.Backend.Send(msg, s)
+	if err != nil {
+		s.Logger.Errorj(map[string]interface{}{
+			"message":   "Error while sending client connected message",
+			"sessionId": s.Id,
+			"error":     err,
+		})
+	}
 	msg.Event = backend.ClientDisconnected
-	defer s.Backend.Send(msg, s)
+	defer func() {
+		s.Logger.Debugj(map[string]interface{}{
+			"message":   "Sending client disconnected message",
+			"sessionId": s.Id,
+		})
+		err := s.Backend.Send(msg, s)
+		if err != nil {
+			s.Logger.Errorj(map[string]interface{}{
+				"message":   "Error while sending client disconnected message",
+				"sessionId": s.Id,
+				"error":     err,
+			})
+		}
+	}()
 
 loop:
 	for {
 		select {
 		case incomingMsg := <-s.Connection.Receiver():
-			s.Backend.Send(backend.BackendMessage{
+			s.Logger.Debugj(map[string]interface{}{
+				"message":   "Received message from client, forwarding to backend",
+				"sessionId": s.Id,
+				"payload":   string(incomingMsg),
+			})
+			err := s.Backend.Send(backend.BackendMessage{
 				SessionId:    s.Id,
 				ReplyChannel: s.ReplyChannel,
 				Event:        backend.MessageReceived,
 				Payload:      incomingMsg,
 			}, s)
+			if err != nil {
+				s.Logger.Errorj(map[string]interface{}{
+					"message":   "Error while sending message received message",
+					"sessionId": s.Id,
+					"error":     err,
+				})
+			}
 		case <-s.Connection.Done():
+			s.Logger.Infoj(map[string]interface{}{
+				"message":   "WebSocket connection closed, session done",
+				"sessionId": s.Id,
+			})
 			break loop
 		}
 	}
@@ -100,4 +152,6 @@ type SessionParams struct {
 	Backend backend.Backend
 	// Connection provides the WebSocket connection interface
 	Connection WebsocketConn
+	// Session logger
+	Logger echo.Logger
 }

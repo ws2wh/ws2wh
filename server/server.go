@@ -39,7 +39,8 @@ func CreateServer(
 	frontendAddr string,
 	websocketPath string,
 	backendUrl string,
-	replyPathPrefix string) *Server {
+	replyPathPrefix string,
+	logLevel string) *Server {
 
 	s := Server{
 		frontendAddr: frontendAddr,
@@ -49,11 +50,11 @@ func CreateServer(
 	s.DefaultBackend = backend.CreateBackend(backendUrl)
 
 	es := echo.New()
-	es.Use(middleware.Logger())
-	es.Logger.SetLevel(log.DEBUG)
 	es.HideBanner = true
+	es.HidePort = true
+	es.Logger.SetLevel(parse(logLevel))
 
-	// should we recover from panic?
+	es.Use(middleware.Logger())
 	es.Use(middleware.Recover())
 
 	replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(replyPathPrefix, "/"))
@@ -61,39 +62,58 @@ func CreateServer(
 	es.POST(replyPath, s.send)
 
 	s.echoStack = es
-	fmt.Printf("⇨ backend action: POST %s\n", backendUrl)
-	fmt.Printf("⇨ websocket upgrade path: %s\n", websocketPath)
+	es.Logger.Infoj(map[string]interface{}{
+		"message":       "Starting server...",
+		"backendUrl":    backendUrl,
+		"websocketPath": websocketPath,
+		"frontendAddr":  frontendAddr,
+	})
 
 	return &s
 }
 
 // Start begins listening for connections on the configured address
 func (s *Server) Start() {
-	log.SetLevel(log.DEBUG)
 	e := s.echoStack
-	e.Logger.Info(e.Start(s.frontendAddr))
+	e.Logger.Fatalj(map[string]interface{}{
+		"error": e.Start(s.frontendAddr),
+	})
 }
 
 // Stop gracefully shuts down the server
 func (s *Server) Stop() {
-	s.echoStack.Shutdown(context.Background())
+	err := s.echoStack.Shutdown(context.Background())
+	if err != nil {
+		s.echoStack.Logger.Fatalj(map[string]interface{}{
+			"message": "Error while gracefully shutting down server",
+			"error":   err,
+		})
+	}
 }
 
 func (s *Server) handle(c echo.Context) error {
 	id := uuid.NewString()
-	handler := frontend.NewWsHandler()
+	logger := c.Logger()
+	handler := frontend.NewWsHandler(logger, id)
 
 	s.sessions[id] = session.NewSession(session.SessionParams{
 		Id:           id,
 		Backend:      s.DefaultBackend,
 		ReplyChannel: fmt.Sprintf("%s://%s/reply/%s", c.Scheme(), c.Request().Host, id),
 		Connection:   handler,
+		Logger:       logger,
 	})
 
 	defer delete(s.sessions, id)
 
 	go s.sessions[id].Receive()
-	handler.Handle(c.Response().Writer, c.Request(), c.Response().Header())
+	err := handler.Handle(c.Response().Writer, c.Request(), c.Response().Header())
+	if err != nil {
+		c.Logger().Errorj(map[string]interface{}{
+			"message": "Error while handling WebSocket connection",
+			"error":   err,
+		})
+	}
 	return nil
 }
 
@@ -104,18 +124,33 @@ func (s *Server) send(c echo.Context) error {
 	session := s.sessions[id]
 
 	if session == nil {
-		c.JSON(http.StatusNotFound, SessionResponse{Success: false, Message: "NOT_FOUND"})
+		err := c.JSON(http.StatusNotFound, SessionResponse{Success: false, Message: "NOT_FOUND"})
+		if err != nil {
+			c.Logger().Errorj(map[string]interface{}{
+				"message": "Error while sending response",
+				"error":   err,
+			})
+		}
 	}
 
 	if len(body) > 0 {
-		session.Send(body)
+		err := session.Send(body)
+		if err != nil {
+			c.Logger().Errorj(map[string]interface{}{
+				"message": "Error while sending message",
+				"error":   err,
+			})
+		}
 	}
 
 	if c.Request().Header.Get(backend.CommandHeader) == backend.TerminateSessionCommand {
 		err := session.Close()
 
 		if err != nil {
-			c.Logger().Error(err)
+			c.Logger().Errorj(map[string]interface{}{
+				"message": "Error while closing session",
+				"error":   err,
+			})
 		}
 	}
 
@@ -126,4 +161,22 @@ func (s *Server) send(c echo.Context) error {
 type SessionResponse struct {
 	Success bool        `json:"success"`
 	Message interface{} `json:"message,omitempty"`
+}
+
+func parse(logLevel string) log.Lvl {
+	switch strings.ToUpper(logLevel) {
+	case "DEBUG":
+		return log.DEBUG
+	case "INFO":
+		return log.INFO
+	case "WARN":
+		return log.WARN
+	case "ERROR":
+		return log.ERROR
+	case "OFF":
+		return log.OFF
+	}
+
+	log.Warnf("Unknown log level: %s, using INFO instead", logLevel)
+	return log.INFO
 }

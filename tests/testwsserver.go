@@ -12,7 +12,7 @@ const OriginUrl = "http://localhost"
 
 func CreateTestWs() TestWsServer {
 	return TestWsServer{
-		server: *server.CreateServer(WsHost, "/", BackendUrl, "/reply"),
+		server: *server.CreateServer(WsHost, "/", BackendUrl, "/reply", "DEBUG"),
 	}
 }
 
