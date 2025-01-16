@@ -22,6 +22,7 @@ type Server struct {
 	DefaultBackend backend.Backend
 	frontendAddr   string
 	backendUrl     string
+	replyUrl       string
 	sessions       map[string]*session.Session
 	echoStack      *echo.Echo
 }
@@ -33,6 +34,7 @@ type Server struct {
 //   - websocketPath: The path where WebSocket connections will be upgraded (e.g. "/ws")
 //   - backendUrl: The URL where backend messages will be sent
 //   - replyPathPrefix: The prefix for reply endpoints (e.g. "/reply")
+//   - replyUrl: The URL where reply messages will be sent (e.g. "http://my-host:3000/reply")
 //
 // Returns a configured Server instance ready to be started
 func CreateServer(
@@ -40,11 +42,13 @@ func CreateServer(
 	websocketPath string,
 	backendUrl string,
 	replyPathPrefix string,
-	logLevel string) *Server {
+	logLevel string,
+	replyUrl string) *Server {
 
 	s := Server{
 		frontendAddr: frontendAddr,
 		backendUrl:   backendUrl,
+		replyUrl:     replyUrl,
 		sessions:     make(map[string]*session.Session, 100),
 	}
 	s.DefaultBackend = backend.CreateBackend(backendUrl)
@@ -99,7 +103,7 @@ func (s *Server) handle(c echo.Context) error {
 	s.sessions[id] = session.NewSession(session.SessionParams{
 		Id:           id,
 		Backend:      s.DefaultBackend,
-		ReplyChannel: fmt.Sprintf("%s://%s/reply/%s", c.Scheme(), c.Request().Host, id),
+		ReplyChannel: fmt.Sprintf("%s/%s", s.replyUrl, id),
 		Connection:   handler,
 		Logger:       logger,
 	})

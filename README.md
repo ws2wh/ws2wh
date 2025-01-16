@@ -5,7 +5,7 @@ WS2WH is a lightweight bridge that connects WebSocket clients to HTTP webhook en
 ## Usage
 
 ```
-ws2wh -b https://example.com/api/v1/webhook -r /reply -l :3000 -p /
+ws2wh -b https://example.com/api/v1/webhook -r /reply -l :3000 -p / -v INFO -h localhost -t
 ```
 
 Parameters can be provided either as command-line flags or environment variables:
@@ -16,6 +16,8 @@ Parameters can be provided either as command-line flags or environment variables
 | `-r` | `REPLY_PATH_PREFIX` | `/reply` | Path prefix for backend replies |
 | `-l` | `WS_PORT` | `:3000` | Address and port for the WebSocket server to listen on |
 | `-p` | `WS_PATH` | `/` | Path where WebSocket connections will be upgraded |
+| `-v` | `LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARN, ERROR, OFF) |
+| `-h` | `REPLY_HOSTNAME` or `HOSTNAME` | `localhost` | Hostname to use in reply channel |
 
 Example using environment variables:
 
@@ -24,6 +26,8 @@ export BACKEND_URL=https://example.com/api/v1/webhook
 export REPLY_PATH_PREFIX=/reply
 export WS_PORT=3000
 export WS_PATH=/
+export LOG_LEVEL=INFO
+export REPLY_HOSTNAME=localhost
 ws2wh
 ```
 
@@ -140,23 +144,4 @@ Async message to client
 #### 4. Session Termination
 
 ##### 4.1 With Goodbye Message
-```http
-POST /reply/550e8400-e29b-41d4-a716-446655440000 HTTP/1.1
-Host: ws2wh-host:3000
-Content-Type: text/plain
-Ws-Command: terminate-session
-Content-Length: 14
-
-Goodbye client
-```
-
-##### 4.2 Client Disconnection Notification
-```http
-POST /webhook HTTP/1.1
-Host: backend-server.com
-Ws-Session-Id: 550e8400-e29b-41d4-a716-446655440000
-Ws-Reply-Channel: http://ws2wh-host:3000/reply/550e8400-e29b-41d4-a716-446655440000
-Ws-Event: client-disconnected
-Content-Length: 0
-
 ```

@@ -22,6 +22,8 @@ func main() {
 	websocketListener := flag.String("l", fmt.Sprintf(":%s", getEnvOrDefault("WS_PORT", "3000")), "Websocket frontend listener address")
 	websocketPath := flag.String("p", getEnvOrDefault("WS_PATH", "/"), "Websocket upgrade path")
 	logLevel := flag.String("v", getEnvOrDefault("LOG_LEVEL", "INFO"), "Log level (DEBUG,	INFO, WARN, ERROR, OFF; default: INFO)")
+	hostname := flag.String("h", getEnvOrDefault("REPLY_HOSTNAME", getEnvOrDefault("HOSTNAME", "localhost")), "Hostname to use in reply channel")
+	replyTls := flag.Bool("t", false, "Use TLS for reply channel")
 
 	flag.Parse()
 	if *backendUrl == "" {
@@ -32,7 +34,21 @@ func main() {
 		log.Fatalf("Invalid backend URL: %s", *backendUrl)
 	}
 
-	server.CreateServer(*websocketListener, *websocketPath, *backendUrl, *replyPathPrefix, *logLevel).Start()
+	var replyScheme string
+	if *replyTls {
+		replyScheme = "https"
+	} else {
+		replyScheme = "http"
+	}
+	replyUrl := fmt.Sprintf("%s://%s%s%s", replyScheme, *hostname, *websocketListener, *replyPathPrefix)
+	server.CreateServer(
+		*websocketListener,
+		*websocketPath,
+		*backendUrl,
+		*replyPathPrefix,
+		*logLevel,
+		replyUrl,
+	).Start()
 }
 
 func getEnvOrDefault(key, fallback string) string {
