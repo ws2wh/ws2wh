@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/labstack/gommon/log"
-	"github.com/pmartynski/ws2wh/backend"
+	"github.com/ws2wh/ws2wh/backend"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -1,4 +1,4 @@
-module github.com/pmartynski/ws2wh
+module github.com/ws2wh/ws2wh
 
 go 1.23.0
 
