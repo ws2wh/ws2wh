@@ -5,7 +5,7 @@ package session
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/pmartynski/ws2wh/backend"
+	"github.com/ws2wh/ws2wh/backend"
 )
 
 // Session represents a WebSocket session that bridges communication between a client and backend

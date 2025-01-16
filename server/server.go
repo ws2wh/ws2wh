@@ -12,9 +12,9 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
-	"github.com/pmartynski/ws2wh/backend"
-	"github.com/pmartynski/ws2wh/frontend"
-	"github.com/pmartynski/ws2wh/session"
+	"github.com/ws2wh/ws2wh/backend"
+	"github.com/ws2wh/ws2wh/frontend"
+	"github.com/ws2wh/ws2wh/session"
 )
 
 // Server handles WebSocket connections and forwards messages to a configured backend

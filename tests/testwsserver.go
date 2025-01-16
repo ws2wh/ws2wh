@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"github.com/pmartynski/ws2wh/server"
+	"github.com/ws2wh/ws2wh/server"
 )
 
 const WsHost = ":3000"

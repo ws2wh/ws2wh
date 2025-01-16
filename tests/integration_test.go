@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/pmartynski/ws2wh/backend"
+	"github.com/ws2wh/ws2wh/backend"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/pmartynski/ws2wh/backend"
+	"github.com/ws2wh/ws2wh/backend"
 )
 
 type TestWebhook struct {

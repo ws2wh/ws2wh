@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/pmartynski/ws2wh/server"
+	"github.com/ws2wh/ws2wh/server"
 )
 
 // main starts the WS2WH server with configuration from flags or environment variables
