@@ -8,11 +8,10 @@ const WsHost = ":3000"
 const WsUrl = "ws://localhost:3000"
 const BackendHost = ":5000"
 const BackendUrl = "http://localhost:5000"
-const OriginUrl = "http://localhost"
 
 func CreateTestWs() TestWsServer {
 	return TestWsServer{
-		server: *server.CreateServer(WsHost, "/", BackendUrl, "/reply", "DEBUG"),
+		server: *server.CreateServer(WsHost, "/", BackendUrl, "/reply", "DEBUG", "http://localhost:3000/reply"),
 	}
 }
 
