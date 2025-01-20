@@ -35,6 +35,7 @@ func (b *TestWebhook) handler(c echo.Context) error {
 		SessionId:    c.Request().Header.Get(backend.SessionIdHeader),
 		ReplyChannel: c.Request().Header.Get(backend.ReplyChannelHeader),
 		Event:        backend.ParseWsEvent(c.Request().Header.Get(backend.EventHeader)),
+		QueryString:  c.Request().Header.Get(backend.QueryStringHeader),
 		Payload:      p,
 	}
 

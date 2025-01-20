@@ -18,6 +18,9 @@ const ReplyChannelHeader = "Ws-Reply-Channel"
 // EventHeader indicates the type of WebSocket event that occurred
 const EventHeader = "Ws-Event"
 
+// QueryStringHeader contains the query string from the client
+const QueryStringHeader = "Ws-Query-String"
+
 // CommandHeader specifies the command to execute on the WebSocket connection
 const CommandHeader = "Ws-Command"
 
@@ -109,6 +112,8 @@ type BackendMessage struct {
 	Event WsEvent
 	// Payload contains the raw message data bytes
 	Payload []byte
+	// QueryString contains the query string from the client
+	QueryString string
 }
 
 type httpClient interface {
@@ -132,6 +137,11 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 		ReplyChannelHeader: {msg.ReplyChannel},
 		EventHeader:        {msg.Event.String()},
 	}
+
+	if len(msg.QueryString) > 0 {
+		h[QueryStringHeader] = []string{msg.QueryString}
+	}
+
 	req.Header = h
 
 	if err != nil {

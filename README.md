@@ -48,6 +48,7 @@ When WS2WH forwards messages to the backend, it sends HTTP POST requests with th
 
 ```
 Ws-Session-Id: <unique session identifier>
+Ws-Query-String: <query string from the WS client (if any)>
 Ws-Reply-Channel: <reply URL for this session>
 Ws-Event: <event type>
 ```
