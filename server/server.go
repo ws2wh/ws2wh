@@ -104,6 +104,7 @@ func (s *Server) handle(c echo.Context) error {
 		Id:           id,
 		Backend:      s.DefaultBackend,
 		ReplyChannel: fmt.Sprintf("%s/%s", s.replyUrl, id),
+		QueryString:  c.QueryString(),
 		Connection:   handler,
 		Logger:       logger,
 	})

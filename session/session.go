@@ -14,6 +14,8 @@ type Session struct {
 	Id string
 	// ReplyChannel is the URL where backend responses should be sent back to
 	ReplyChannel string
+	// QueryString contains the query string from the client
+	QueryString string
 	// Backend handles delivering messages to the configured backend service
 	Backend backend.Backend
 	// Connection manages the WebSocket connection with the client
@@ -40,9 +42,10 @@ func NewSession(params SessionParams) *Session {
 // Returns an error if sending the message fails
 func (s *Session) Send(message []byte) error {
 	s.Logger.Debugj(map[string]interface{}{
-		"message":   "Sending message to client",
-		"sessionId": s.Id,
-		"payload":   string(message),
+		"message":     "Sending message to client",
+		"sessionId":   s.Id,
+		"payload":     string(message),
+		"queryString": s.QueryString,
 	})
 	return s.Connection.Send(message)
 }
@@ -74,6 +77,7 @@ func (s *Session) Receive() {
 		ReplyChannel: s.ReplyChannel,
 		Event:        backend.ClientConnected,
 		Payload:      make([]byte, 0),
+		QueryString:  s.QueryString,
 	}
 
 	err := s.Backend.Send(msg, s)
@@ -87,8 +91,9 @@ func (s *Session) Receive() {
 	msg.Event = backend.ClientDisconnected
 	defer func() {
 		s.Logger.Debugj(map[string]interface{}{
-			"message":   "Sending client disconnected message",
-			"sessionId": s.Id,
+			"message":     "Sending client disconnected message",
+			"sessionId":   s.Id,
+			"queryString": s.QueryString,
 		})
 		err := s.Backend.Send(msg, s)
 		if err != nil {
@@ -105,15 +110,17 @@ loop:
 		select {
 		case incomingMsg := <-s.Connection.Receiver():
 			s.Logger.Debugj(map[string]interface{}{
-				"message":   "Received message from client, forwarding to backend",
-				"sessionId": s.Id,
-				"payload":   string(incomingMsg),
+				"message":     "Received message from client, forwarding to backend",
+				"sessionId":   s.Id,
+				"payload":     string(incomingMsg),
+				"queryString": s.QueryString,
 			})
 			err := s.Backend.Send(backend.BackendMessage{
 				SessionId:    s.Id,
 				ReplyChannel: s.ReplyChannel,
 				Event:        backend.MessageReceived,
 				Payload:      incomingMsg,
+				QueryString:  s.QueryString,
 			}, s)
 			if err != nil {
 				s.Logger.Errorj(map[string]interface{}{
@@ -148,6 +155,8 @@ type SessionParams struct {
 	Id string
 	// ReplyChannel is the URL where backend responses should be sent
 	ReplyChannel string
+	// QueryString contains the query string from the client
+	QueryString string
 	// Backend handles sending messages to the configured backend service
 	Backend backend.Backend
 	// Connection provides the WebSocket connection interface

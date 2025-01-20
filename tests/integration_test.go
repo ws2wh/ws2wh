@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/ws2wh/ws2wh/backend"
 	"github.com/stretchr/testify/assert"
+	"github.com/ws2wh/ws2wh/backend"
 )
 
 // TestWebsocketToWebhook tests the full flow of WebSocket to webhook communication:
@@ -33,22 +33,23 @@ func TestWebsocketToWebhook(t *testing.T) {
 	// make sure ws server is up
 	time.Sleep(time.Millisecond * 10)
 
-	conn, sessionId, replyUrl := clientConnected(wh, t)
-	websocketClientMessageSent(conn, wh, sessionId, t)
+	expectedQueryString := "test=" + uuid.NewString()
+	conn, sessionId, replyUrl := clientConnected(wh, t, expectedQueryString)
+	websocketClientMessageSent(conn, wh, sessionId, expectedQueryString, t)
 	backendMessageSent(conn, replyUrl, t)
 	websocketClientMessageWithImmediateBackendResponse(conn, wh, sessionId, t)
 	websocketClientDisconnected(conn, wh, sessionId, t)
 
-	conn, _, replyUrl = clientConnected(wh, t)
+	conn, _, replyUrl = clientConnected(wh, t, "")
 	sessionTerminatedByBackend(conn, replyUrl, t)
 }
 
 // clientConnected establishes a WebSocket connection and verifies the backend
 // receives the connection event with proper session ID and reply URL
-func clientConnected(wh *TestWebhook, t *testing.T) (conn *websocket.Conn, sessionId string, replyUrl string) {
+func clientConnected(wh *TestWebhook, t *testing.T, queryString string) (conn *websocket.Conn, sessionId string, replyUrl string) {
 	assert := assert.New(t)
 
-	conn, _, err := websocket.DefaultDialer.Dial(WsUrl, nil)
+	conn, _, err := websocket.DefaultDialer.Dial(WsUrl+"?"+queryString, nil)
 	assert.Nil(err, "should accept websocket connection")
 	onConnected := wh.WaitForMessage(t)
 	assert.NotNil(onConnected, "received message should not be nil")
@@ -61,7 +62,7 @@ func clientConnected(wh *TestWebhook, t *testing.T) (conn *websocket.Conn, sessi
 
 // websocketClientMessageSent tests sending a message from WebSocket client
 // and verifies it is properly forwarded to the backend webhook
-func websocketClientMessageSent(conn *websocket.Conn, wh *TestWebhook, sessionId string, t *testing.T) {
+func websocketClientMessageSent(conn *websocket.Conn, wh *TestWebhook, sessionId string, expectedQueryString string, t *testing.T) {
 	assert := assert.New(t)
 
 	clientMsg := []byte(uuid.NewString())
@@ -72,6 +73,9 @@ func websocketClientMessageSent(conn *websocket.Conn, wh *TestWebhook, sessionId
 	assert.Equal(sessionId, onMessage.SessionId, "backend should receive message with expected session id")
 	assert.Equal(backend.MessageReceived, onMessage.Event, "backend should receive messagereceived message")
 	assert.Equal(clientMsg, onMessage.Payload, "backend should receive exact same payload as the ws client sent in request body")
+	if expectedQueryString != "" {
+		assert.Equal(expectedQueryString, onMessage.QueryString, "backend should receive exact same query string as the ws client sent in request body")
+	}
 }
 
 // backendMessageSent tests sending a message from the backend via reply URL
@@ -104,7 +108,7 @@ func websocketClientMessageWithImmediateBackendResponse(conn *websocket.Conn, wh
 	wsClientChan := make(chan []byte, 1)
 	defer close(wsClientChan)
 	go captureMessage(conn, wsClientChan)
-	websocketClientMessageSent(conn, wh, sessionId, t)
+	websocketClientMessageSent(conn, wh, sessionId, "", t)
 	actualResponse := waitForMessage(t, wsClientChan)
 	assert.Equal(expectedResponse, actualResponse, "immediate backend response body should be received by websocket client connected to session")
 }
