@@ -2,8 +2,6 @@ on:
   schedule:
     - cron: "0 1 * * *"
   workflow_dispatch:
-  push:
-    branches: ['24-periodical-image-vulnerability-scan']
 
 jobs:
   build:
