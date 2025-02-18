@@ -1,4 +1,4 @@
-# WS2WH
+# WS2WH ![build workflow](https://github.com/ws2wh/ws2wh/actions/workflows/build.yml/badge.svg) ![secscan workflow](https://github.com/ws2wh/ws2wh/actions/workflows/secscan.yml/badge.svg)
 
 WS2WH is a lightweight bridge that connects WebSocket clients to HTTP webhook endpoints. It enables real-time, bidirectional communication by converting WebSocket messages into HTTP POST requests and vice versa. This tool is particularly useful when you need to integrate WebSocket-based clients with HTTP-only backend services, or when you want to add WebSocket support to existing HTTP APIs without modifying the backend. With a simple configuration, WS2WH handles the protocol translation and message routing, making it an ideal solution for scenarios requiring real-time updates in HTTP-based architectures.
 
