@@ -1,16 +1,21 @@
 on:
   schedule:
     - cron: "0 1 * * *"
-  
+  workflow_dispatch:
+  push:
+    branches: ['24-periodical-image-vulnerability-scan']
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Get latest release
-        uses: octokit/request-action@v2.4.0
+        uses: octokit/request-action@v2.x
         id: get_latest_release
         with:
-          route: GET /repos/{owner}/{repo}/releases/latest
+          route: GET /repos/ws2wh/ws2wh/releases/latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: "echo latest release: '${{ steps.get_latest_release.outputs.data }}'"
 
       - name: Aqua Security Trivy
