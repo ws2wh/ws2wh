@@ -41,3 +41,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+      - name: Aqua Security Trivy
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          image-ref: ghcr.io/ws2wh/ws2wh:${{ steps.meta.outputs.tags }}
+          format: 'table'
+          exit-code: '1'
