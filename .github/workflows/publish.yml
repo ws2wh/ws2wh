@@ -44,6 +44,6 @@ jobs:
       - name: Aqua Security Trivy
         uses: aquasecurity/trivy-action@0.29.0
         with:
-          image-ref: ghcr.io/ws2wh/ws2wh:${{ steps.meta.outputs.tags }}
+          image-ref: ${{ steps.meta.outputs.tags }}
           format: 'table'
           exit-code: '1'
