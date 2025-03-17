@@ -131,7 +131,7 @@ loop:
 			}
 		case <-s.Connection.Done():
 			s.Logger.Infoj(map[string]interface{}{
-				"message":   "WebSocket connection closed, session done",
+				"message":   "Session done",
 				"sessionId": s.Id,
 			})
 			break loop

@@ -37,6 +37,7 @@ type WebsocketHandler struct {
 	conn            *websocket.Conn
 	logger          echo.Logger
 	sessionId       string
+	closed          bool
 }
 
 // Send writes a message to the WebSocket connection
@@ -58,9 +59,7 @@ func (h *WebsocketHandler) Done() chan interface{} {
 func (h *WebsocketHandler) Close() error {
 	h.doneChannel <- 1
 
-	m.DisconnectCounter.With(prometheus.Labels{
-		m.OriginLabel: m.OriginValueBackend,
-	}).Inc()
+	h.closed = true
 
 	err := h.conn.WriteMessage(websocket.CloseMessage, make([]byte, 0))
 	if err != nil {
@@ -95,28 +94,9 @@ func (h *WebsocketHandler) Handle(w http.ResponseWriter, r *http.Request, respon
 	h.conn = conn
 	for {
 		_, msg, err := conn.ReadMessage()
-		if websocket.IsCloseError(err) {
-
-			m.DisconnectCounter.With(prometheus.Labels{
-				m.OriginLabel: m.OriginValueClient,
-			}).Inc()
-
-			h.logger.Infoj(map[string]interface{}{
-				"message":   "Closing connection",
-				"sessionId": h.sessionId,
-			})
-			h.doneChannel <- 1
-			return nil
-		}
 
 		if err != nil {
-			h.logger.Errorj(map[string]interface{}{
-				"message":   "Error while reading message",
-				"sessionId": h.sessionId,
-				"error":     err,
-			})
-			h.doneChannel <- 1
-			return err
+			return h.handleReadMessageErr(err)
 		}
 
 		h.logger.Debugj(map[string]interface{}{
@@ -126,4 +106,47 @@ func (h *WebsocketHandler) Handle(w http.ResponseWriter, r *http.Request, respon
 		})
 		h.receiverChannel <- msg
 	}
+}
+
+func (h *WebsocketHandler) handleReadMessageErr(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	defer func() { h.doneChannel <- 1 }()
+
+	if h.closed {
+		m.DisconnectCounter.With(prometheus.Labels{
+			m.OriginLabel: m.OriginValueBackend,
+		}).Inc()
+		h.logger.Infoj(map[string]interface{}{
+			"message":   "Backend closed connection",
+			"sessionId": h.sessionId,
+		})
+		return nil
+	}
+
+	if websocket.IsCloseError(err, 1000, 1001, 1005) {
+		m.DisconnectCounter.With(prometheus.Labels{
+			m.OriginLabel: m.OriginValueClient,
+		}).Inc()
+
+		h.logger.Infoj(map[string]interface{}{
+			"message":   "Client closed connection",
+			"sessionId": h.sessionId,
+		})
+		return nil
+	}
+
+	m.DisconnectCounter.With(prometheus.Labels{
+		m.OriginLabel: m.OriginValueClient,
+	}).Inc()
+
+	h.logger.Errorj(map[string]interface{}{
+		"message":   "Error while reading message",
+		"sessionId": h.sessionId,
+		"error":     err,
+	})
+
+	return err
 }
