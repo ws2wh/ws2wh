@@ -14,6 +14,7 @@ import (
 	"github.com/labstack/gommon/log"
 	"github.com/ws2wh/ws2wh/backend"
 	"github.com/ws2wh/ws2wh/frontend"
+	m "github.com/ws2wh/ws2wh/metrics/directory"
 	"github.com/ws2wh/ws2wh/session"
 )
 
@@ -51,12 +52,13 @@ func CreateServer(
 		replyUrl:     replyUrl,
 		sessions:     make(map[string]*session.Session, 100),
 	}
-	s.DefaultBackend = backend.CreateBackend(backendUrl)
 
 	es := echo.New()
 	es.HideBanner = true
 	es.HidePort = true
 	es.Logger.SetLevel(parse(logLevel))
+
+	s.DefaultBackend = backend.CreateBackend(backendUrl, es.Logger)
 
 	es.Use(middleware.Logger())
 	es.Use(middleware.Recover())
@@ -109,6 +111,9 @@ func (s *Server) handle(c echo.Context) error {
 		Logger:       logger,
 	})
 
+	m.ActiveSessionsGauge.Inc()
+
+	defer m.ActiveSessionsGauge.Dec()
 	defer delete(s.sessions, id)
 
 	go s.sessions[id].Receive()

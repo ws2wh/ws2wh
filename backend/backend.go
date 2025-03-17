@@ -7,6 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/labstack/echo/v4"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/ws2wh/ws2wh/metrics/directory"
 )
 
 // SessionIdHeader is used to identify the WebSocket session in HTTP headers
@@ -95,10 +99,11 @@ type Backend interface {
 // CreateBackend creates a new Backend instance that sends messages via HTTP webhooks
 // url specifies the webhook endpoint URL that will receive the messages
 // Returns a Backend interface using the default HTTP client for making webhook requests
-func CreateBackend(url string) *WebhookBackend {
+func CreateBackend(url string, logger echo.Logger) *WebhookBackend {
 	return &WebhookBackend{
 		url:    url,
 		client: http.DefaultClient,
+		logger: logger,
 	}
 }
 
@@ -123,6 +128,7 @@ type httpClient interface {
 type WebhookBackend struct {
 	url    string
 	client httpClient
+	logger echo.Logger
 }
 
 // Send delivers a message to the configured webhook endpoint
@@ -145,31 +151,73 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 	req.Header = h
 
 	if err != nil {
+		w.logger.Errorj(map[string]interface{}{
+			"message": "Error while creating request",
+			"error":   err,
+			"session": msg.SessionId,
+		})
 		return err
 	}
 
 	res, err := w.client.Do(req)
 	if err != nil {
+		w.logger.Errorj(map[string]interface{}{
+			"message": "Error while sending message to backend",
+			"error":   err,
+			"session": msg.SessionId,
+		})
+		directory.MessageFailureCounter.With(prometheus.Labels{
+			directory.OriginLabel: directory.OriginValueClient,
+		}).Inc()
+
 		return err
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		w.logger.Errorj(map[string]interface{}{
+			"message": "Unsuccessful delivery to backend",
+			"status":  res.StatusCode,
+			"session": msg.SessionId,
+		})
 		_, err := io.ReadAll(res.Body)
 		if err != nil {
+			w.logger.Errorj(map[string]interface{}{
+				"message": "Error while reading response body",
+				"error":   err,
+				"session": msg.SessionId,
+			})
 			return err
 		}
+
+		directory.MessageFailureCounter.With(prometheus.Labels{
+			directory.OriginLabel: directory.OriginValueClient,
+		}).Inc()
 
 		return fmt.Errorf("unsuccessful delivery to %s", w.url)
 	}
 
+	directory.MessageSuccessCounter.With(prometheus.Labels{
+		directory.OriginLabel: directory.OriginValueClient,
+	}).Inc()
+
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
+		w.logger.Errorj(map[string]interface{}{
+			"message": "Error while reading response body",
+			"error":   err,
+			"session": msg.SessionId,
+		})
 		return err
 	}
 
 	if len(body) > 0 && msg.Event != ClientDisconnected {
 		err = session.Send(body)
 		if err != nil {
+			w.logger.Errorj(map[string]interface{}{
+				"message": "Error while sending response to client",
+				"error":   err,
+				"session": msg.SessionId,
+			})
 			return err
 		}
 	}
@@ -177,6 +225,11 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 	if res.Header.Get(CommandHeader) == TerminateSessionCommand {
 		err = session.Close()
 		if err != nil {
+			w.logger.Errorj(map[string]interface{}{
+				"message": "Error while closing session",
+				"error":   err,
+				"session": msg.SessionId,
+			})
 			return err
 		}
 	}

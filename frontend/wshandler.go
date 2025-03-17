@@ -8,6 +8,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
+	"github.com/prometheus/client_golang/prometheus"
+	m "github.com/ws2wh/ws2wh/metrics/directory"
 )
 
 var upgrader = websocket.Upgrader{
@@ -35,11 +37,29 @@ type WebsocketHandler struct {
 	conn            *websocket.Conn
 	logger          echo.Logger
 	sessionId       string
+	closed          bool
 }
 
 // Send writes a message to the WebSocket connection
 func (h *WebsocketHandler) Send(data []byte) error {
-	return h.conn.WriteMessage(websocket.TextMessage, data)
+	err := h.conn.WriteMessage(websocket.TextMessage, data)
+
+	if err != nil {
+		h.logger.Errorj(map[string]interface{}{
+			"message":   "Error while sending message to client",
+			"sessionId": h.sessionId,
+			"error":     err,
+		})
+		m.MessageFailureCounter.With(prometheus.Labels{
+			m.OriginLabel: m.OriginValueBackend,
+		}).Inc()
+	} else {
+		m.MessageSuccessCounter.With(prometheus.Labels{
+			m.OriginLabel: m.OriginValueBackend,
+		}).Inc()
+	}
+
+	return err
 }
 
 // Receiver returns a channel for receiving incoming WebSocket messages
@@ -55,6 +75,9 @@ func (h *WebsocketHandler) Done() chan interface{} {
 // Close gracefully terminates the WebSocket connection
 func (h *WebsocketHandler) Close() error {
 	h.doneChannel <- 1
+
+	h.closed = true
+
 	err := h.conn.WriteMessage(websocket.CloseMessage, make([]byte, 0))
 	if err != nil {
 		return err
@@ -84,26 +107,13 @@ func (h *WebsocketHandler) Handle(w http.ResponseWriter, r *http.Request, respon
 		return err
 	}
 
+	m.ConnectCounter.Inc()
 	h.conn = conn
 	for {
 		_, msg, err := conn.ReadMessage()
-		if websocket.IsCloseError(err) {
-			h.logger.Infoj(map[string]interface{}{
-				"message":   "Closing connection",
-				"sessionId": h.sessionId,
-			})
-			h.doneChannel <- 1
-			return nil
-		}
 
 		if err != nil {
-			h.logger.Errorj(map[string]interface{}{
-				"message":   "Error while reading message",
-				"sessionId": h.sessionId,
-				"error":     err,
-			})
-			h.doneChannel <- 1
-			return err
+			return h.handleReadMessageErr(err)
 		}
 
 		h.logger.Debugj(map[string]interface{}{
@@ -113,4 +123,47 @@ func (h *WebsocketHandler) Handle(w http.ResponseWriter, r *http.Request, respon
 		})
 		h.receiverChannel <- msg
 	}
+}
+
+func (h *WebsocketHandler) handleReadMessageErr(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	defer func() { h.doneChannel <- 1 }()
+
+	if h.closed {
+		m.DisconnectCounter.With(prometheus.Labels{
+			m.OriginLabel: m.OriginValueBackend,
+		}).Inc()
+		h.logger.Infoj(map[string]interface{}{
+			"message":   "Backend closed connection",
+			"sessionId": h.sessionId,
+		})
+		return nil
+	}
+
+	if websocket.IsCloseError(err, 1000, 1001, 1005) {
+		m.DisconnectCounter.With(prometheus.Labels{
+			m.OriginLabel: m.OriginValueClient,
+		}).Inc()
+
+		h.logger.Infoj(map[string]interface{}{
+			"message":   "Client closed connection",
+			"sessionId": h.sessionId,
+		})
+		return nil
+	}
+
+	m.DisconnectCounter.With(prometheus.Labels{
+		m.OriginLabel: m.OriginValueClient,
+	}).Inc()
+
+	h.logger.Errorj(map[string]interface{}{
+		"message":   "Error while reading message",
+		"sessionId": h.sessionId,
+		"error":     err,
+	})
+
+	return err
 }
