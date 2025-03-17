@@ -42,7 +42,24 @@ type WebsocketHandler struct {
 
 // Send writes a message to the WebSocket connection
 func (h *WebsocketHandler) Send(data []byte) error {
-	return h.conn.WriteMessage(websocket.TextMessage, data)
+	err := h.conn.WriteMessage(websocket.TextMessage, data)
+
+	if err != nil {
+		h.logger.Errorj(map[string]interface{}{
+			"message":   "Error while sending message to client",
+			"sessionId": h.sessionId,
+			"error":     err,
+		})
+		m.MessageFailureCounter.With(prometheus.Labels{
+			m.OriginLabel: m.OriginValueBackend,
+		}).Inc()
+	} else {
+		m.MessageSuccessCounter.With(prometheus.Labels{
+			m.OriginLabel: m.OriginValueBackend,
+		}).Inc()
+	}
+
+	return err
 }
 
 // Receiver returns a channel for receiving incoming WebSocket messages

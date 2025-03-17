@@ -52,12 +52,13 @@ func CreateServer(
 		replyUrl:     replyUrl,
 		sessions:     make(map[string]*session.Session, 100),
 	}
-	s.DefaultBackend = backend.CreateBackend(backendUrl)
 
 	es := echo.New()
 	es.HideBanner = true
 	es.HidePort = true
 	es.Logger.SetLevel(parse(logLevel))
+
+	s.DefaultBackend = backend.CreateBackend(backendUrl, es.Logger)
 
 	es.Use(middleware.Logger())
 	es.Use(middleware.Recover())

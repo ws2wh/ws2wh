@@ -22,7 +22,19 @@ var (
 		Namespace: "ws2wh",
 		Name:      "disconnects_total",
 		Help:      "Disconnect events counter",
-	}, []string{"origin"})
+	}, []string{OriginLabel})
+
+	MessageSuccessCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "ws2wh",
+		Name:      "message_delivered_total",
+		Help:      "Successful message delivery counter",
+	}, []string{OriginLabel})
+
+	MessageFailureCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "ws2wh",
+		Name:      "message_failure_total",
+		Help:      "Failed message delivery counter",
+	}, []string{OriginLabel})
 )
 
 const (
