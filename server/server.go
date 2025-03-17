@@ -14,6 +14,7 @@ import (
 	"github.com/labstack/gommon/log"
 	"github.com/ws2wh/ws2wh/backend"
 	"github.com/ws2wh/ws2wh/frontend"
+	m "github.com/ws2wh/ws2wh/metrics/directory"
 	"github.com/ws2wh/ws2wh/session"
 )
 
@@ -109,6 +110,9 @@ func (s *Server) handle(c echo.Context) error {
 		Logger:       logger,
 	})
 
+	m.ActiveSessionsGauge.Inc()
+
+	defer m.ActiveSessionsGauge.Dec()
 	defer delete(s.sessions, id)
 
 	go s.sessions[id].Receive()

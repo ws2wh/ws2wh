@@ -8,6 +8,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
+	"github.com/prometheus/client_golang/prometheus"
+	m "github.com/ws2wh/ws2wh/metrics/directory"
 )
 
 var upgrader = websocket.Upgrader{
@@ -55,6 +57,11 @@ func (h *WebsocketHandler) Done() chan interface{} {
 // Close gracefully terminates the WebSocket connection
 func (h *WebsocketHandler) Close() error {
 	h.doneChannel <- 1
+
+	m.DisconnectCounter.With(prometheus.Labels{
+		m.OriginLabel: m.OriginValueBackend,
+	}).Inc()
+
 	err := h.conn.WriteMessage(websocket.CloseMessage, make([]byte, 0))
 	if err != nil {
 		return err
@@ -84,10 +91,16 @@ func (h *WebsocketHandler) Handle(w http.ResponseWriter, r *http.Request, respon
 		return err
 	}
 
+	m.ConnectCounter.Inc()
 	h.conn = conn
 	for {
 		_, msg, err := conn.ReadMessage()
 		if websocket.IsCloseError(err) {
+
+			m.DisconnectCounter.With(prometheus.Labels{
+				m.OriginLabel: m.OriginValueClient,
+			}).Inc()
+
 			h.logger.Infoj(map[string]interface{}{
 				"message":   "Closing connection",
 				"sessionId": h.sessionId,
