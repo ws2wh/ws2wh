@@ -14,7 +14,7 @@ jobs:
           route: GET /repos/ws2wh/ws2wh/releases/latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: "echo latest release: '${{ steps.get_latest_release.outputs.data }}'"
+      - run: "echo latest release: '${{ steps.get_latest_release.outputs.data.tag_name }}'"
 
       - name: Aqua Security Trivy
         uses: aquasecurity/trivy-action@0.29.0
