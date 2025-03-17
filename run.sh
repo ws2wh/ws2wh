@@ -2,4 +2,4 @@
 
 set -eu
 
-go run cmd/ws2wh/main.go -b $1
+go run cmd/ws2wh/main.go -b $1 -metrics-enabled true

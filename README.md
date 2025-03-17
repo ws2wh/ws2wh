@@ -18,6 +18,9 @@ Parameters can be provided either as command-line flags or environment variables
 | `-p` | `WS_PATH` | `/` | Path where WebSocket connections will be upgraded |
 | `-v` | `LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARN, ERROR, OFF) |
 | `-h` | `REPLY_HOSTNAME` or `HOSTNAME` | `localhost` | Hostname to use in reply channel |
+| `-metrics-port` | `METRICS_PORT` | `9090` | Prometheus metrics port |
+| `-metrics-path` | `METRICS_PATH` | `/metrics` | Prometheus metrics path |
+| `-metrics-enabled` | `METRICS_ENABLED` | `false` | Enables Prometheus metrics endpoint |
 
 Example using environment variables:
 
@@ -28,6 +31,9 @@ export WS_PORT=3000
 export WS_PATH=/
 export LOG_LEVEL=INFO
 export REPLY_HOSTNAME=localhost
+export METRICS_PORT=9090
+export METRICS_PATH=/metrics
+export METRICS_ENABLED=true
 ws2wh
 ```
 
@@ -144,5 +150,14 @@ Async message to client
 
 #### 4. Session Termination
 
-##### 4.1 With Goodbye Message
+The session can be proactively terminated by the backend by sending a `Ws-Command: terminate-session` header to a session reply channel.
+
+```http
+POST /reply/550e8400-e29b-41d4-a716-446655440000 HTTP/1.1
+Host: ws2wh-host:3000
+Ws-Command: terminate-session
+Content-Type: text/plain
+Content-Length: 10
+
+Goodbye!
 ```
