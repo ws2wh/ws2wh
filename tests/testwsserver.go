@@ -11,7 +11,15 @@ const BackendUrl = "http://localhost:5000"
 
 func CreateTestWs() TestWsServer {
 	return TestWsServer{
-		server: *server.CreateServer(WsHost, "/", BackendUrl, "/reply", "DEBUG", "http://localhost:3000/reply"),
+		server: *server.CreateServer(
+			WsHost,
+			"/", BackendUrl,
+			"/reply",
+			"DEBUG",
+			"",
+			"",
+			"http://localhost:3000/reply",
+		),
 	}
 }
 

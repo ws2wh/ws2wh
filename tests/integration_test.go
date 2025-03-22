@@ -180,7 +180,7 @@ func captureMessage(ws *websocket.Conn, out chan []byte) {
 	out <- incomingMsg
 }
 
-// waitForMessage waits up to 1 second for a message on the channel
+// waitForMessage waits up to set timeout duration for a message on the channel
 // and returns it, or fails the test if timeout occurs
 func waitForMessage(t *testing.T, out chan []byte) []byte {
 	ctx, cancel := context.WithTimeout(context.Background(), TestTimeout)
