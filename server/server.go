@@ -27,6 +27,8 @@ type Server struct {
 	replyUrl       string
 	sessions       map[string]*session.Session
 	echoStack      *echo.Echo
+	tlsCertPath    string
+	tlsKeyPath     string
 }
 
 // CreateServer initializes a new Server instance with the given configuration
@@ -45,6 +47,8 @@ func CreateServer(
 	backendUrl string,
 	replyPathPrefix string,
 	logLevel string,
+	tlsCertPath string,
+	tlsKeyPath string,
 	replyUrl string) *Server {
 
 	s := Server{
@@ -52,6 +56,8 @@ func CreateServer(
 		backendUrl:   backendUrl,
 		replyUrl:     replyUrl,
 		sessions:     make(map[string]*session.Session, 100),
+		tlsCertPath:  tlsCertPath,
+		tlsKeyPath:   tlsKeyPath,
 	}
 
 	es := echo.New()
@@ -84,30 +90,24 @@ func (s *Server) Start() {
 	e := s.echoStack
 	server := &http.Server{
 		Addr: s.frontendAddr,
-		// TLSConfig: &tls.Config{
-		// 	MinVersion: tls.VersionTLS12,
-		// 	Certificates: []tls.Certificate{
-		// 		loadCertificate(),
-		// 	},
-		// },
+		TLSConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
 		Handler: e,
 	}
 
-	err := server.ListenAndServeTLS("localhost.crt", "localhost.key")
+	var err error
+	if s.tlsCertPath != "" && s.tlsKeyPath != "" {
+		err = server.ListenAndServeTLS(s.tlsCertPath, s.tlsKeyPath)
+	} else {
+		err = server.ListenAndServe()
+	}
+
 	if err != nil {
 		e.Logger.Errorj(map[string]interface{}{
 			"error": err,
 		})
 	}
-}
-
-func loadCertificate() tls.Certificate {
-	c, e := tls.LoadX509KeyPair("localhost.crt", "localhost.key")
-	if e != nil {
-		panic("xyz")
-	}
-
-	return c
 }
 
 // Stop gracefully shuts down the server
