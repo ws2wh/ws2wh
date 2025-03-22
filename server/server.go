@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -81,9 +82,32 @@ func CreateServer(
 // Start begins listening for connections on the configured address
 func (s *Server) Start() {
 	e := s.echoStack
-	e.Logger.Errorj(map[string]interface{}{
-		"error": e.Start(s.frontendAddr),
-	})
+	server := &http.Server{
+		Addr: s.frontendAddr,
+		// TLSConfig: &tls.Config{
+		// 	MinVersion: tls.VersionTLS12,
+		// 	Certificates: []tls.Certificate{
+		// 		loadCertificate(),
+		// 	},
+		// },
+		Handler: e,
+	}
+
+	err := server.ListenAndServeTLS("localhost.crt", "localhost.key")
+	if err != nil {
+		e.Logger.Errorj(map[string]interface{}{
+			"error": err,
+		})
+	}
+}
+
+func loadCertificate() tls.Certificate {
+	c, e := tls.LoadX509KeyPair("localhost.crt", "localhost.key")
+	if e != nil {
+		panic("xyz")
+	}
+
+	return c
 }
 
 // Stop gracefully shuts down the server
