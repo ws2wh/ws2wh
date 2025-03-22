@@ -104,8 +104,13 @@ func TestSession_Receive(t *testing.T) {
 
 	// Test connection message
 	go func() {
+		// Simulate ready signal
+		conn.doneChan <- ConnectionReadySignal
 		// Simulate message received
 		conn.receiverChan <- []byte("test message")
+		// Simulate closed signal
+		conn.doneChan <- ConnectionClosedSignal
+
 		// Then simulate connection close
 		close(conn.doneChan)
 	}()
