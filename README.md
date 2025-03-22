@@ -21,6 +21,8 @@ Parameters can be provided either as command-line flags or environment variables
 | `-metrics-port` | `METRICS_PORT` | `9090` | Prometheus metrics port |
 | `-metrics-path` | `METRICS_PATH` | `/metrics` | Prometheus metrics path |
 | `-metrics-enabled` | `METRICS_ENABLED` | `false` | Enables Prometheus metrics endpoint |
+| `-tls-cert-path` | `TLS_CERT_PATH` | (optional) | TLS certificate path (PEM format). Required if TLS key path set. |
+| `-tls-key-path` | `TLS_KEY_PATH` | (optional) | TLS key path (PEM format). Required if TLS certificate path set. |
 
 Example using environment variables:
 
@@ -30,10 +32,13 @@ export REPLY_PATH_PREFIX=/reply
 export WS_PORT=3000
 export WS_PATH=/
 export LOG_LEVEL=INFO
-export REPLY_HOSTNAME=localhost
+export REPLY_HOSTNAME=ws.example.com
 export METRICS_PORT=9090
 export METRICS_PATH=/metrics
 export METRICS_ENABLED=true
+export TLS_CERT_PATH=./ws.example.com.crt
+export TLS_KEY_PATH=./ws.example.com.key
+
 ws2wh
 ```
 

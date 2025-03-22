@@ -19,7 +19,6 @@ import (
 // -p, WS_PATH: Path where WebSocket connections will be upgraded (default: /)
 // -v, LOG_LEVEL: Log level (DEBUG, INFO, WARN, ERROR, OFF; default: INFO)
 // -h, REPLY_HOSTNAME: Hostname to use in reply channel (default: localhost)
-// -t: Use TLS for reply channel (default: false)
 // -metrics-port, METRICS_PORT: Port for metrics endpoint (default: 9090)
 // -metrics-path, METRICS_PATH: Path for metrics endpoint (default: /metrics)
 // -metrics-enabled, METRICS_ENABLED: Enable metrics collection (default: false)
@@ -31,10 +30,11 @@ func main() {
 	websocketPath := flag.String("p", getEnvOrDefault("WS_PATH", "/"), "Websocket upgrade path")
 	logLevel := flag.String("v", getEnvOrDefault("LOG_LEVEL", "INFO"), "Log level (DEBUG,	INFO, WARN, ERROR, OFF; default: INFO)")
 	hostname := flag.String("h", getEnvOrDefault("REPLY_HOSTNAME", getEnvOrDefault("HOSTNAME", "localhost")), "Hostname to use in reply channel")
-	replyTls := flag.Bool("t", false, "Use TLS for reply channel")
 	metricsPort := flag.String("metrics-port", getEnvOrDefault("METRICS_PORT", "9090"), "Prometheus metrics port")
 	metricsPath := flag.String("metrics-path", getEnvOrDefault("METRICS_PATH", "/metrics"), "Prometheus metrics path")
 	enableMetrics := flag.String("metrics-enabled", getEnvOrDefault("METRICS_ENABLED", "false"), "Enable Prometheus metrics")
+	tlsCertPath := flag.String("tls-cert-path", getEnvOrDefault("TLS_CERT_PATH", ""), "(Optional) TLS certificate path (PEM format). Required if TLS key path set.")
+	tlsKeyPath := flag.String("tls-key-path", getEnvOrDefault("TLS_KEY_PATH", ""), "(Optional) TLS key path (PEM format). Required if TLS certificate path set.")
 
 	flag.Parse()
 	if *backendUrl == "" {
@@ -45,8 +45,16 @@ func main() {
 		log.Fatalf("Invalid backend URL: %s", *backendUrl)
 	}
 
+	if *tlsCertPath != "" && *tlsKeyPath == "" {
+		log.Fatalf("TLS certificate path set but TLS key path not set")
+	}
+
+	if *tlsCertPath == "" && *tlsKeyPath != "" {
+		log.Fatalf("TLS key path set but TLS certificate path not set")
+	}
+
 	var replyScheme string
-	if *replyTls {
+	if *tlsCertPath != "" && *tlsKeyPath != "" {
 		replyScheme = "https"
 	} else {
 		replyScheme = "http"
@@ -63,6 +71,8 @@ func main() {
 		*backendUrl,
 		*replyPathPrefix,
 		*logLevel,
+		*tlsCertPath,
+		*tlsKeyPath,
 		replyUrl,
 	).Start()
 }

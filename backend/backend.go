@@ -10,7 +10,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/ws2wh/ws2wh/metrics/directory"
+	metrics "github.com/ws2wh/ws2wh/metrics/directory"
 )
 
 // SessionIdHeader is used to identify the WebSocket session in HTTP headers
@@ -166,8 +166,8 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 			"error":   err,
 			"session": msg.SessionId,
 		})
-		directory.MessageFailureCounter.With(prometheus.Labels{
-			directory.OriginLabel: directory.OriginValueClient,
+		metrics.MessageFailureCounter.With(prometheus.Labels{
+			metrics.OriginLabel: metrics.OriginValueClient,
 		}).Inc()
 
 		return err
@@ -189,15 +189,15 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 			return err
 		}
 
-		directory.MessageFailureCounter.With(prometheus.Labels{
-			directory.OriginLabel: directory.OriginValueClient,
+		metrics.MessageFailureCounter.With(prometheus.Labels{
+			metrics.OriginLabel: metrics.OriginValueClient,
 		}).Inc()
 
 		return fmt.Errorf("unsuccessful delivery to %s", w.url)
 	}
 
-	directory.MessageSuccessCounter.With(prometheus.Labels{
-		directory.OriginLabel: directory.OriginValueClient,
+	metrics.MessageSuccessCounter.With(prometheus.Labels{
+		metrics.OriginLabel: metrics.OriginValueClient,
 	}).Inc()
 
 	body, err := io.ReadAll(res.Body)

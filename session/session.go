@@ -47,6 +47,7 @@ func (s *Session) Send(message []byte) error {
 		"payload":     string(message),
 		"queryString": s.QueryString,
 	})
+
 	return s.Connection.Send(message)
 }
 
@@ -67,6 +68,33 @@ func (s *Session) Close() error {
 // - Notifies the backend when the client disconnects
 // - Cleans up the session when done
 func (s *Session) Receive() {
+	s.Logger.Debugj(map[string]interface{}{
+		"message":   "Waiting for connection signal",
+		"sessionId": s.Id,
+	})
+	connSignal := <-s.Connection.Signal()
+	s.Logger.Debugj(map[string]interface{}{
+		"message":   "Received connection signal",
+		"sessionId": s.Id,
+		"signal":    connSignal,
+	})
+	if connSignal == ConnectionClosedSignal {
+		s.Logger.Infoj(map[string]interface{}{
+			"message":   "Session closed due to connection failure",
+			"sessionId": s.Id,
+		})
+		return
+	}
+
+	if connSignal != ConnectionReadySignal {
+		s.Logger.Errorj(map[string]interface{}{
+			"message":   "Session closed due to unexpected connection signal",
+			"sessionId": s.Id,
+			"signal":    connSignal,
+		})
+		return
+	}
+
 	s.Logger.Infoj(map[string]interface{}{
 		"message":   "Starting WebSocket session",
 		"sessionId": s.Id,
@@ -129,7 +157,7 @@ loop:
 					"error":     err,
 				})
 			}
-		case <-s.Connection.Done():
+		case <-s.Connection.Signal():
 			s.Logger.Infoj(map[string]interface{}{
 				"message":   "Session done",
 				"sessionId": s.Id,
@@ -145,7 +173,7 @@ loop:
 type WebsocketConn interface {
 	Send(payload []byte) error
 	Receiver() <-chan []byte
-	Done() chan interface{}
+	Signal() <-chan ConnectionSignal
 	Close() error
 }
 
@@ -164,3 +192,13 @@ type SessionParams struct {
 	// Session logger
 	Logger echo.Logger
 }
+
+type ConnectionSignal int
+
+const (
+	// ConnectionReadySignal is the signal that the connection is ready
+	ConnectionReadySignal ConnectionSignal = 1
+
+	// ConnectionClosedSignal is the signal that the connection is closed
+	ConnectionClosedSignal ConnectionSignal = 2
+)

@@ -59,8 +59,8 @@ func (b *TestWebhook) Stop() {
 	b.echoStack.Shutdown(context.Background())
 }
 
-func (b *TestWebhook) WaitForMessage(t *testing.T) backend.BackendMessage {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+func (b *TestWebhook) WaitForMessage(t *testing.T, timeout time.Duration) backend.BackendMessage {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	select {
 	case m := <-b.messages:

@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,6 +27,8 @@ type Server struct {
 	replyUrl       string
 	sessions       map[string]*session.Session
 	echoStack      *echo.Echo
+	tlsCertPath    string
+	tlsKeyPath     string
 }
 
 // CreateServer initializes a new Server instance with the given configuration
@@ -44,6 +47,8 @@ func CreateServer(
 	backendUrl string,
 	replyPathPrefix string,
 	logLevel string,
+	tlsCertPath string,
+	tlsKeyPath string,
 	replyUrl string) *Server {
 
 	s := Server{
@@ -51,6 +56,8 @@ func CreateServer(
 		backendUrl:   backendUrl,
 		replyUrl:     replyUrl,
 		sessions:     make(map[string]*session.Session, 100),
+		tlsCertPath:  tlsCertPath,
+		tlsKeyPath:   tlsKeyPath,
 	}
 
 	es := echo.New()
@@ -81,9 +88,26 @@ func CreateServer(
 // Start begins listening for connections on the configured address
 func (s *Server) Start() {
 	e := s.echoStack
-	e.Logger.Errorj(map[string]interface{}{
-		"error": e.Start(s.frontendAddr),
-	})
+	server := &http.Server{
+		Addr: s.frontendAddr,
+		TLSConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
+		Handler: e,
+	}
+
+	var err error
+	if s.tlsCertPath != "" && s.tlsKeyPath != "" {
+		err = server.ListenAndServeTLS(s.tlsCertPath, s.tlsKeyPath)
+	} else {
+		err = server.ListenAndServe()
+	}
+
+	if err != nil {
+		e.Logger.Errorj(map[string]interface{}{
+			"error": err,
+		})
+	}
 }
 
 // Stop gracefully shuts down the server

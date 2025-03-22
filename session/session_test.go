@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/labstack/gommon/log"
-	"github.com/ws2wh/ws2wh/backend"
 	"github.com/stretchr/testify/assert"
+	"github.com/ws2wh/ws2wh/backend"
 )
 
 // MockWebsocketConn implements WebsocketConn for testing
@@ -13,7 +13,7 @@ type MockWebsocketConn struct {
 	sendCalled   bool
 	closeCalled  bool
 	receiverChan chan []byte
-	doneChan     chan interface{}
+	doneChan     chan ConnectionSignal
 	sendError    error
 	closeError   error
 }
@@ -21,7 +21,7 @@ type MockWebsocketConn struct {
 func NewMockWebsocketConn() *MockWebsocketConn {
 	return &MockWebsocketConn{
 		receiverChan: make(chan []byte),
-		doneChan:     make(chan interface{}),
+		doneChan:     make(chan ConnectionSignal),
 	}
 }
 
@@ -34,7 +34,7 @@ func (m *MockWebsocketConn) Receiver() <-chan []byte {
 	return m.receiverChan
 }
 
-func (m *MockWebsocketConn) Done() chan interface{} {
+func (m *MockWebsocketConn) Signal() <-chan ConnectionSignal {
 	return m.doneChan
 }
 
@@ -104,8 +104,13 @@ func TestSession_Receive(t *testing.T) {
 
 	// Test connection message
 	go func() {
+		// Simulate ready signal
+		conn.doneChan <- ConnectionReadySignal
 		// Simulate message received
 		conn.receiverChan <- []byte("test message")
+		// Simulate closed signal
+		conn.doneChan <- ConnectionClosedSignal
+
 		// Then simulate connection close
 		close(conn.doneChan)
 	}()
