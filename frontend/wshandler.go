@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	m "github.com/ws2wh/ws2wh/metrics/directory"
+	"github.com/ws2wh/ws2wh/session"
 )
 
 var upgrader = websocket.Upgrader{
@@ -21,7 +22,7 @@ var upgrader = websocket.Upgrader{
 func NewWsHandler(logger echo.Logger, id string) *WebsocketHandler {
 	h := WebsocketHandler{
 		receiverChannel: make(chan []byte, 64),
-		doneChannel:     make(chan interface{}, 1),
+		signalChannel:   make(chan session.ConnectionSignal, 2),
 		logger:          logger,
 		sessionId:       id,
 	}
@@ -33,7 +34,7 @@ func NewWsHandler(logger echo.Logger, id string) *WebsocketHandler {
 // for sending/receiving messages and handling connection lifecycle
 type WebsocketHandler struct {
 	receiverChannel chan []byte
-	doneChannel     chan interface{}
+	signalChannel   chan session.ConnectionSignal
 	conn            *websocket.Conn
 	logger          echo.Logger
 	sessionId       string
@@ -67,14 +68,14 @@ func (h *WebsocketHandler) Receiver() <-chan []byte {
 	return h.receiverChannel
 }
 
-// Done returns a channel that signals when the connection is terminated
-func (h *WebsocketHandler) Done() chan interface{} {
-	return h.doneChannel
+// Signal returns a channel that signals when the connection is ready or closed
+func (h *WebsocketHandler) Signal() <-chan session.ConnectionSignal {
+	return h.signalChannel
 }
 
 // Close gracefully terminates the WebSocket connection
 func (h *WebsocketHandler) Close() error {
-	h.doneChannel <- 1
+	h.signalChannel <- session.ConnectionClosedSignal
 
 	h.closed = true
 
@@ -90,13 +91,15 @@ func (h *WebsocketHandler) Close() error {
 // It reads messages from the connection and forwards them to the receiver channel.
 // The connection is terminated when a close message is received or on error.
 func (h *WebsocketHandler) Handle(w http.ResponseWriter, r *http.Request, responseHeader http.Header) error {
-	defer close(h.doneChannel)
+	defer close(h.signalChannel)
+	defer func() { h.signalChannel <- session.ConnectionClosedSignal }()
 	defer close(h.receiverChannel)
 
 	h.logger.Infoj(map[string]interface{}{
 		"message":   "Upgrading HTTP to WS",
 		"sessionId": h.sessionId,
 	})
+
 	conn, err := upgrader.Upgrade(w, r, responseHeader)
 	if err != nil {
 		h.logger.Errorj(map[string]interface{}{
@@ -109,6 +112,8 @@ func (h *WebsocketHandler) Handle(w http.ResponseWriter, r *http.Request, respon
 
 	m.ConnectCounter.Inc()
 	h.conn = conn
+	h.signalChannel <- session.ConnectionReadySignal
+
 	for {
 		_, msg, err := conn.ReadMessage()
 
@@ -130,7 +135,7 @@ func (h *WebsocketHandler) handleReadMessageErr(err error) error {
 		return nil
 	}
 
-	defer func() { h.doneChannel <- 1 }()
+	defer func() { h.signalChannel <- session.ConnectionClosedSignal }()
 
 	if h.closed {
 		m.DisconnectCounter.With(prometheus.Labels{

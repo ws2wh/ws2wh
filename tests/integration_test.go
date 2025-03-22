@@ -14,6 +14,11 @@ import (
 	"github.com/ws2wh/ws2wh/backend"
 )
 
+const (
+	// May be increased e.g. for debugging
+	TestTimeout = time.Second * 1
+)
+
 // TestWebsocketToWebhook tests the full flow of WebSocket to webhook communication:
 // 1. Client connects via WebSocket
 // 2. Client sends a message that gets forwarded to webhook
@@ -51,7 +56,7 @@ func clientConnected(wh *TestWebhook, t *testing.T, queryString string) (conn *w
 
 	conn, _, err := websocket.DefaultDialer.Dial(WsUrl+"?"+queryString, nil)
 	assert.Nil(err, "should accept websocket connection")
-	onConnected := wh.WaitForMessage(t)
+	onConnected := wh.WaitForMessage(t, TestTimeout)
 	assert.NotNil(onConnected, "received message should not be nil")
 
 	assert.Equal(backend.ClientConnected, onConnected.Event, "should receive on connected event message")
@@ -69,7 +74,7 @@ func websocketClientMessageSent(conn *websocket.Conn, wh *TestWebhook, sessionId
 	err := conn.WriteMessage(websocket.TextMessage, clientMsg)
 	assert.Nil(err, "should successfully send websocket message via ws client")
 
-	onMessage := wh.WaitForMessage(t)
+	onMessage := wh.WaitForMessage(t, TestTimeout)
 	assert.Equal(sessionId, onMessage.SessionId, "backend should receive message with expected session id")
 	assert.Equal(backend.MessageReceived, onMessage.Event, "backend should receive messagereceived message")
 	assert.Equal(clientMsg, onMessage.Payload, "backend should receive exact same payload as the ws client sent in request body")
@@ -119,7 +124,7 @@ func websocketClientDisconnected(conn *websocket.Conn, wh *TestWebhook, sessionI
 	assert := assert.New(t)
 
 	conn.Close()
-	onClosed := wh.WaitForMessage(t)
+	onClosed := wh.WaitForMessage(t, TestTimeout)
 
 	assert.NotNil(onClosed, "backend should receive non-empty message")
 	assert.Equal(backend.ClientDisconnected, onClosed.Event, "backend received message should have client disconnected event header")
@@ -178,7 +183,7 @@ func captureMessage(ws *websocket.Conn, out chan []byte) {
 // waitForMessage waits up to 1 second for a message on the channel
 // and returns it, or fails the test if timeout occurs
 func waitForMessage(t *testing.T, out chan []byte) []byte {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	ctx, cancel := context.WithTimeout(context.Background(), TestTimeout)
 	defer cancel()
 
 	select {
