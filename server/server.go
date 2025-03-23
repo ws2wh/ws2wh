@@ -41,7 +41,7 @@ func CreateServerWithConfig(config *Config) *Server {
 	s := Server{
 		frontendAddr: config.WebSocketListener,
 		backendUrl:   config.BackendUrl,
-		replyUrl:     config.ReplyUrl,
+		replyUrl:     config.ReplyChannelConfig.GetReplyUrl(),
 		sessions:     make(map[string]*session.Session, 100),
 		tlsCertPath:  config.TlsConfig.TlsCertPath,
 		tlsKeyPath:   config.TlsConfig.TlsKeyPath,
@@ -49,7 +49,7 @@ func CreateServerWithConfig(config *Config) *Server {
 
 	s.echoStack = buildEchoStack(config.LogLevel)
 	s.DefaultBackend = backend.CreateBackend(config.BackendUrl, s.echoStack.Logger)
-	replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(config.ReplyPathPrefix, "/"))
+	replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(config.ReplyChannelConfig.PathPrefix, "/"))
 	s.echoStack.GET(config.WebSocketPath, s.handle)
 	s.echoStack.POST(replyPath, s.send)
 

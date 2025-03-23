@@ -51,7 +51,6 @@ func LoadConfig() *server.Config {
 	} else {
 		replyScheme = "http"
 	}
-	replyUrl := fmt.Sprintf("%s://%s%s%s", replyScheme, *hostname, *websocketListener, *replyPathPrefix)
 
 	if *enableMetrics == "true" {
 		metrics.StartMetricsServer(*metricsPort, *metricsPath)
@@ -59,13 +58,12 @@ func LoadConfig() *server.Config {
 
 	return &server.Config{
 		BackendUrl: *backendUrl,
-		// TODO: rearrange how reply channel is handled:
-		// - set ReplyPathPrefix
-		// - set ReplyChannelHostname
-		// - set ReplyChannelScheme
-		// - consider separate port for reply channel, for future use with separate listeners
-		ReplyPathPrefix:   *replyPathPrefix,
-		ReplyUrl:          replyUrl,
+		ReplyChannelConfig: &server.ReplyChannelConfig{
+			PathPrefix: *replyPathPrefix,
+			Hostname:   *hostname,
+			Scheme:     replyScheme,
+			Port:       strings.Replace(*websocketListener, ":", "", 1),
+		},
 		WebSocketListener: *websocketListener,
 		WebSocketPath:     *websocketPath,
 		LogLevel:          parse(*logLevel),

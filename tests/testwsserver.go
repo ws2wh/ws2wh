@@ -18,10 +18,14 @@ func CreateTestWs() TestWsServer {
 			BackendUrl:        BackendUrl,
 			WebSocketListener: WsHost,
 			WebSocketPath:     "/",
-			ReplyPathPrefix:   "/reply",
-			ReplyUrl:          "http://localhost:3000/reply",
-			LogLevel:          log.DEBUG,
-			Hostname:          "localhost",
+			ReplyChannelConfig: &server.ReplyChannelConfig{
+				PathPrefix: "/reply",
+				Hostname:   "localhost",
+				Scheme:     "http",
+				Port:       "3000",
+			},
+			LogLevel: log.DEBUG,
+			Hostname: "localhost",
 			MetricsConfig: &metrics.MetricsConfig{
 				Enabled: false,
 			},
