@@ -31,53 +31,6 @@ type Server struct {
 	tlsKeyPath     string
 }
 
-// CreateServer initializes a new Server instance with the given configuration
-//
-// Parameters:
-//   - frontendAddr: The address and port to listen on (e.g. ":3000")
-//   - websocketPath: The path where WebSocket connections will be upgraded (e.g. "/ws")
-//   - backendUrl: The URL where backend messages will be sent
-//   - replyPathPrefix: The prefix for reply endpoints (e.g. "/reply")
-//   - replyUrl: The URL where reply messages will be sent (e.g. "http://my-host:3000/reply")
-//
-// # Returns a configured Server instance ready to be started
-//
-// Deprecated: Use CreateServerWithConfig instead
-func CreateServer(
-	frontendAddr string,
-	websocketPath string,
-	backendUrl string,
-	replyPathPrefix string,
-	logLevel log.Lvl,
-	tlsCertPath string,
-	tlsKeyPath string,
-	replyUrl string) *Server {
-
-	s := Server{
-		frontendAddr: frontendAddr,
-		backendUrl:   backendUrl,
-		replyUrl:     replyUrl,
-		sessions:     make(map[string]*session.Session, 100),
-		tlsCertPath:  tlsCertPath,
-		tlsKeyPath:   tlsKeyPath,
-	}
-
-	s.echoStack = buildEchoStack(logLevel)
-
-	s.DefaultBackend = backend.CreateBackend(backendUrl, s.echoStack.Logger)
-	replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(replyPathPrefix, "/"))
-	s.echoStack.GET(websocketPath, s.handle)
-	s.echoStack.POST(replyPath, s.send)
-	s.echoStack.Logger.Infoj(map[string]interface{}{
-		"message":       "Starting server...",
-		"backendUrl":    backendUrl,
-		"websocketPath": websocketPath,
-		"frontendAddr":  frontendAddr,
-	})
-
-	return &s
-}
-
 // CreateServerWithConfig initializes a new Server instance with the given configuration
 //
 // Parameters:

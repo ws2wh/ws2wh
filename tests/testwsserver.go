@@ -2,6 +2,7 @@ package tests
 
 import (
 	"github.com/labstack/gommon/log"
+	"github.com/ws2wh/ws2wh/metrics"
 	"github.com/ws2wh/ws2wh/server"
 )
 
@@ -12,15 +13,22 @@ const BackendUrl = "http://localhost:5000"
 
 func CreateTestWs() TestWsServer {
 	return TestWsServer{
-		server: *server.CreateServer(
-			WsHost,
-			"/", BackendUrl,
-			"/reply",
-			log.DEBUG,
-			"",
-			"",
-			"http://localhost:3000/reply",
-		),
+
+		server: *server.CreateServerWithConfig(&server.Config{
+			BackendUrl:        BackendUrl,
+			WebSocketListener: WsHost,
+			WebSocketPath:     "/",
+			ReplyPathPrefix:   "/reply",
+			ReplyUrl:          "http://localhost:3000/reply",
+			LogLevel:          log.DEBUG,
+			Hostname:          "localhost",
+			MetricsConfig: &metrics.MetricsConfig{
+				Enabled: false,
+			},
+			TlsConfig: &server.TlsConfig{
+				Enabled: false,
+			},
+		}),
 	}
 }
 
