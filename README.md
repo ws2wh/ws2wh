@@ -18,9 +18,10 @@ Parameters can be provided either as command-line flags or environment variables
 | `-p` | `WS_PATH` | `/` | Path where WebSocket connections will be upgraded |
 | `-v` | `LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARN, ERROR, OFF) |
 | `-h` | `REPLY_HOSTNAME` or `HOSTNAME` | `localhost` | Hostname to use in reply channel |
+| `-metrics-enabled` | `METRICS_ENABLED` | `false` | Enables Prometheus metrics endpoint |
 | `-metrics-port` | `METRICS_PORT` | `9090` | Prometheus metrics port |
 | `-metrics-path` | `METRICS_PATH` | `/metrics` | Prometheus metrics path |
-| `-metrics-enabled` | `METRICS_ENABLED` | `false` | Enables Prometheus metrics endpoint |
+| `-tls-enabled` | `TLS_ENABLED` | `false` | Enables TLS |
 | `-tls-cert-path` | `TLS_CERT_PATH` | (optional) | TLS certificate path (PEM format). Required if TLS key path set. |
 | `-tls-key-path` | `TLS_KEY_PATH` | (optional) | TLS key path (PEM format). Required if TLS certificate path set. |
 
@@ -33,9 +34,10 @@ export WS_PORT=3000
 export WS_PATH=/
 export LOG_LEVEL=INFO
 export REPLY_HOSTNAME=ws.example.com
+export METRICS_ENABLED=true
 export METRICS_PORT=9090
 export METRICS_PATH=/metrics
-export METRICS_ENABLED=true
+export TLS_ENABLED=true
 export TLS_CERT_PATH=./ws.example.com.crt
 export TLS_KEY_PATH=./ws.example.com.key
 

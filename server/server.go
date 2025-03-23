@@ -40,13 +40,15 @@ type Server struct {
 //   - replyPathPrefix: The prefix for reply endpoints (e.g. "/reply")
 //   - replyUrl: The URL where reply messages will be sent (e.g. "http://my-host:3000/reply")
 //
-// Returns a configured Server instance ready to be started
+// # Returns a configured Server instance ready to be started
+//
+// Deprecated: Use CreateServerWithConfig instead
 func CreateServer(
 	frontendAddr string,
 	websocketPath string,
 	backendUrl string,
 	replyPathPrefix string,
-	logLevel string,
+	logLevel log.Lvl,
 	tlsCertPath string,
 	tlsKeyPath string,
 	replyUrl string) *Server {
@@ -60,22 +62,13 @@ func CreateServer(
 		tlsKeyPath:   tlsKeyPath,
 	}
 
-	es := echo.New()
-	es.HideBanner = true
-	es.HidePort = true
-	es.Logger.SetLevel(parse(logLevel))
+	s.echoStack = buildEchoStack(logLevel)
 
-	s.DefaultBackend = backend.CreateBackend(backendUrl, es.Logger)
-
-	es.Use(middleware.Logger())
-	es.Use(middleware.Recover())
-
+	s.DefaultBackend = backend.CreateBackend(backendUrl, s.echoStack.Logger)
 	replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(replyPathPrefix, "/"))
-	es.GET(websocketPath, s.handle)
-	es.POST(replyPath, s.send)
-
-	s.echoStack = es
-	es.Logger.Infoj(map[string]interface{}{
+	s.echoStack.GET(websocketPath, s.handle)
+	s.echoStack.POST(replyPath, s.send)
+	s.echoStack.Logger.Infoj(map[string]interface{}{
 		"message":       "Starting server...",
 		"backendUrl":    backendUrl,
 		"websocketPath": websocketPath,
@@ -83,6 +76,50 @@ func CreateServer(
 	})
 
 	return &s
+}
+
+// CreateServerWithConfig initializes a new Server instance with the given configuration
+//
+// Parameters:
+//   - config: A pointer to a Config struct containing the server configuration
+//
+// # Returns a configured Server instance ready to be started
+func CreateServerWithConfig(config *Config) *Server {
+	s := Server{
+		frontendAddr: config.WebSocketListener,
+		backendUrl:   config.BackendUrl,
+		replyUrl:     config.ReplyUrl,
+		sessions:     make(map[string]*session.Session, 100),
+		tlsCertPath:  config.TlsConfig.TlsCertPath,
+		tlsKeyPath:   config.TlsConfig.TlsKeyPath,
+	}
+
+	s.echoStack = buildEchoStack(config.LogLevel)
+	s.DefaultBackend = backend.CreateBackend(config.BackendUrl, s.echoStack.Logger)
+	replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(config.ReplyPathPrefix, "/"))
+	s.echoStack.GET(config.WebSocketPath, s.handle)
+	s.echoStack.POST(replyPath, s.send)
+
+	s.echoStack.Logger.Infoj(map[string]interface{}{
+		"message":       "Starting server...",
+		"backendUrl":    config.BackendUrl,
+		"websocketPath": config.WebSocketPath,
+		"frontendAddr":  config.WebSocketListener,
+	})
+
+	return &s
+}
+
+func buildEchoStack(logLevel log.Lvl) *echo.Echo {
+	es := echo.New()
+	es.HideBanner = true
+	es.HidePort = true
+	es.Logger.SetLevel(logLevel)
+
+	es.Use(middleware.Logger())
+	es.Use(middleware.Recover())
+
+	return es
 }
 
 // Start begins listening for connections on the configured address
@@ -195,22 +232,4 @@ func (s *Server) send(c echo.Context) error {
 type SessionResponse struct {
 	Success bool        `json:"success"`
 	Message interface{} `json:"message,omitempty"`
-}
-
-func parse(logLevel string) log.Lvl {
-	switch strings.ToUpper(logLevel) {
-	case "DEBUG":
-		return log.DEBUG
-	case "INFO":
-		return log.INFO
-	case "WARN":
-		return log.WARN
-	case "ERROR":
-		return log.ERROR
-	case "OFF":
-		return log.OFF
-	}
-
-	log.Warnf("Unknown log level: %s, using INFO instead", logLevel)
-	return log.INFO
 }

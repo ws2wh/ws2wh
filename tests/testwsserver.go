@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/labstack/gommon/log"
 	"github.com/ws2wh/ws2wh/server"
 )
 
@@ -15,7 +16,7 @@ func CreateTestWs() TestWsServer {
 			WsHost,
 			"/", BackendUrl,
 			"/reply",
-			"DEBUG",
+			log.DEBUG,
 			"",
 			"",
 			"http://localhost:3000/reply",
