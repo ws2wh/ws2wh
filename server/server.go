@@ -26,7 +26,7 @@ type Server struct {
 	backendUrl     string
 	replyUrl       string
 	sessions       map[string]*session.Session
-	echoStack      *echo.Echo
+	httpHandler    *echo.Echo
 	tlsCertPath    string
 	tlsKeyPath     string
 }
@@ -47,13 +47,13 @@ func CreateServerWithConfig(config *Config) *Server {
 		tlsKeyPath:   config.TlsConfig.TlsKeyPath,
 	}
 
-	s.echoStack = buildEchoStack(config.LogLevel)
-	s.DefaultBackend = backend.CreateBackend(config.BackendUrl, s.echoStack.Logger)
+	s.httpHandler = buildEchoStack(config.LogLevel)
+	s.DefaultBackend = backend.CreateBackend(config.BackendUrl, s.httpHandler.Logger)
 	replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(config.ReplyChannelConfig.PathPrefix, "/"))
-	s.echoStack.GET(config.WebSocketPath, s.handle)
-	s.echoStack.POST(replyPath, s.send)
+	s.httpHandler.GET(config.WebSocketPath, s.handle)
+	s.httpHandler.POST(replyPath, s.send)
 
-	s.echoStack.Logger.Infoj(map[string]interface{}{
+	s.httpHandler.Logger.Infoj(map[string]interface{}{
 		"message":       "Starting server...",
 		"backendUrl":    config.BackendUrl,
 		"websocketPath": config.WebSocketPath,
@@ -64,6 +64,8 @@ func CreateServerWithConfig(config *Config) *Server {
 }
 
 func buildEchoStack(logLevel log.Lvl) *echo.Echo {
+	// TODO: replace echo stack with gorilla mux
+	// TODO: replace echo logger (gommon/log) with slog
 	es := echo.New()
 	es.HideBanner = true
 	es.HidePort = true
@@ -76,8 +78,8 @@ func buildEchoStack(logLevel log.Lvl) *echo.Echo {
 }
 
 // Start begins listening for connections on the configured address
-func (s *Server) Start() {
-	e := s.echoStack
+func (s *Server) Start(ctx context.Context) {
+	e := s.httpHandler
 	server := &http.Server{
 		Addr: s.frontendAddr,
 		TLSConfig: &tls.Config{
@@ -86,29 +88,30 @@ func (s *Server) Start() {
 		Handler: e,
 	}
 
-	var err error
-	if s.tlsCertPath != "" && s.tlsKeyPath != "" {
-		err = server.ListenAndServeTLS(s.tlsCertPath, s.tlsKeyPath)
-	} else {
-		err = server.ListenAndServe()
-	}
+	go func() {
+		var err error
+		if s.tlsCertPath != "" && s.tlsKeyPath != "" {
+			err = server.ListenAndServeTLS(s.tlsCertPath, s.tlsKeyPath)
+		} else {
+			err = server.ListenAndServe()
+		}
 
-	if err != nil {
-		e.Logger.Errorj(map[string]interface{}{
-			"error": err,
-		})
-	}
-}
+		if err != nil {
+			e.Logger.Errorj(map[string]interface{}{
+				"error": err,
+			})
+		}
+	}()
 
-// Stop gracefully shuts down the server
-func (s *Server) Stop() {
-	err := s.echoStack.Shutdown(context.Background())
-	if err != nil {
-		s.echoStack.Logger.Fatalj(map[string]interface{}{
-			"message": "Error while gracefully shutting down server",
-			"error":   err,
-		})
-	}
+	go func() {
+		<-ctx.Done()
+		if err := server.Shutdown(context.Background()); err != nil {
+			e.Logger.Errorj(map[string]interface{}{
+				"message": "Error during gracefully server shutdown",
+				"error":   err,
+			})
+		}
+	}()
 }
 
 func (s *Server) handle(c echo.Context) error {

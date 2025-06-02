@@ -1,18 +1,28 @@
 package main
 
 import (
+	"context"
+	"os"
+	"os/signal"
+
 	"github.com/ws2wh/ws2wh/cmd/ws2wh/flags"
 	"github.com/ws2wh/ws2wh/metrics"
 	"github.com/ws2wh/ws2wh/server"
 )
 
 func main() {
-	// TODO: all listeners should be started here with a context cancelled with a signal
 	// TODO: need to create integration/smoke tests for all listeners loaded from config
 	config := flags.LoadConfig()
-	if config.MetricsConfig != nil && config.MetricsConfig.Enabled {
-		metrics.StartMetricsServer(config.MetricsConfig.Port, config.MetricsConfig.Path)
-	}
 
-	server.CreateServerWithConfig(config).Start()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	metrics.StartMetricsServer(ctx, config.MetricsConfig)
+	server.CreateServerWithConfig(config).Start(ctx)
+
+	sigs := make(chan os.Signal, 1)
+
+	signal.Notify(sigs, os.Interrupt, os.Kill)
+	<-sigs
+
+	cancel()
 }

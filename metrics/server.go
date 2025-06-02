@@ -11,31 +11,50 @@ import (
 
 var server *http.Server
 
-func StartMetricsServer(port string, path string) {
+func StartMetricsServer(ctx context.Context, config *MetricsConfig) {
+	if config == nil || !config.Enabled {
+		return
+	}
+
 	mux := http.NewServeMux()
-	mux.Handle(path, promhttp.Handler())
+	mux.Handle(config.Path, promhttp.Handler())
 	server = &http.Server{
-		Addr:    ":" + port,
+		Addr:    ":" + config.Port,
 		Handler: mux,
 	}
+
+	log.Infoj(map[string]interface{}{
+		"message": "Starting metrics server",
+		"port":    config.Port,
+		"path":    config.Path,
+	})
+
 	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Errorj(map[string]interface{}{
+				"message": "Metrics server error",
+				"error":   err,
+			})
+		}
+	}()
+
+	go func() {
+		<-ctx.Done()
 		log.Infoj(map[string]interface{}{
-			"message": "Starting metrics server",
-			"port":    port,
-			"path":    path,
+			"message": "Context cancelled, shutting down metrics server",
 		})
-		server.ListenAndServe()
+		stopMetricsServer()
 	}()
 }
 
-func StopMetricsServer(ctx context.Context) {
+func stopMetricsServer() {
 	if server == nil {
 		return
 	}
 	log.Infoj(map[string]interface{}{
 		"message": "Stopping metrics server",
 	})
-	server.Shutdown(ctx)
+	server.Shutdown(context.Background())
 	log.Infoj(map[string]interface{}{
 		"message": "Metrics server stopped",
 	})

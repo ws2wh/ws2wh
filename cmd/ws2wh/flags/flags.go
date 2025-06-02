@@ -52,10 +52,6 @@ func LoadConfig() *server.Config {
 		replyScheme = "http"
 	}
 
-	if *enableMetrics == "true" {
-		metrics.StartMetricsServer(*metricsPort, *metricsPath)
-	}
-
 	return &server.Config{
 		BackendUrl: *backendUrl,
 		ReplyChannelConfig: &server.ReplyChannelConfig{
