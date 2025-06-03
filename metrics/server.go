@@ -9,7 +9,6 @@ import (
 )
 
 var server *http.Server
-var logger = slog.With("category", "metrics_server")
 
 func StartMetricsServer(ctx context.Context, config *MetricsConfig) {
 	if config == nil || !config.Enabled {
@@ -23,17 +22,17 @@ func StartMetricsServer(ctx context.Context, config *MetricsConfig) {
 		Handler: mux,
 	}
 
-	logger.Info("Starting metrics server", "port", config.Port, "path", config.Path)
+	slog.Info("Starting metrics server", "port", config.Port, "path", config.Path)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("Metrics server error", "error", err)
+			slog.Error("Metrics server error", "error", err)
 		}
 	}()
 
 	go func() {
 		<-ctx.Done()
-		logger.Info("Context cancelled, shutting down metrics server")
+		slog.Info("Context cancelled, shutting down metrics server")
 		stopMetricsServer()
 	}()
 }
@@ -42,7 +41,7 @@ func stopMetricsServer() {
 	if server == nil {
 		return
 	}
-	logger.Info("Stopping metrics server")
+	slog.Info("Stopping metrics server")
 	server.Shutdown(context.Background())
-	logger.Info("Metrics server stopped")
+	slog.Info("Metrics server stopped")
 }

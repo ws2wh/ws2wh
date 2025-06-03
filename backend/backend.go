@@ -34,8 +34,6 @@ const SendMessageCommand = "send-message"
 // TerminateSessionCommand instructs the server to close the WebSocket connection
 const TerminateSessionCommand = "terminate-session"
 
-var logger = slog.Default().With("category", "backend")
-
 // WsEvent represents different types of WebSocket events that can occur
 type WsEvent int
 
@@ -151,13 +149,13 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 	req.Header = h
 
 	if err != nil {
-		logger.Error("Error while creating request", "error", err, "sessionId", msg.SessionId)
+		slog.Error("Error while creating request", "error", err, "sessionId", msg.SessionId)
 		return err
 	}
 
 	res, err := w.client.Do(req)
 	if err != nil {
-		logger.Error("Error while sending message to backend", "error", err, "sessionId", msg.SessionId)
+		slog.Error("Error while sending message to backend", "error", err, "sessionId", msg.SessionId)
 		metrics.MessageFailureCounter.With(prometheus.Labels{
 			metrics.OriginLabel: metrics.OriginValueClient,
 		}).Inc()
@@ -166,10 +164,10 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		logger.Error("Unsuccessful delivery to backend", "status", res.StatusCode, "sessionId", msg.SessionId)
+		slog.Error("Unsuccessful delivery to backend", "status", res.StatusCode, "sessionId", msg.SessionId)
 		_, err := io.ReadAll(res.Body)
 		if err != nil {
-			logger.Error("Error while reading response body", "error", err, "sessionId", msg.SessionId)
+			slog.Error("Error while reading response body", "error", err, "sessionId", msg.SessionId)
 			return err
 		}
 
@@ -186,14 +184,14 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		logger.Error("Error while reading response body", "error", err, "sessionId", msg.SessionId)
+		slog.Error("Error while reading response body", "error", err, "sessionId", msg.SessionId)
 		return err
 	}
 
 	if len(body) > 0 && msg.Event != ClientDisconnected {
 		err = session.Send(body)
 		if err != nil {
-			logger.Error("Error while sending response to client", "error", err, "sessionId", msg.SessionId)
+			slog.Error("Error while sending response to client", "error", err, "sessionId", msg.SessionId)
 			return err
 		}
 	}
@@ -201,7 +199,7 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 	if res.Header.Get(CommandHeader) == TerminateSessionCommand {
 		err = session.Close()
 		if err != nil {
-			logger.Error("Error while closing session", "error", err, "sessionId", msg.SessionId)
+			slog.Error("Error while closing session", "error", err, "sessionId", msg.SessionId)
 			return err
 		}
 	}

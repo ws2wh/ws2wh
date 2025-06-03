@@ -19,8 +19,6 @@ import (
 	"github.com/ws2wh/ws2wh/session"
 )
 
-var logger = slog.Default().With("category", "server")
-
 // Server handles WebSocket connections and forwards messages to a configured backend
 type Server struct {
 	DefaultBackend backend.Backend
@@ -52,7 +50,7 @@ func CreateServerWithConfig(config *Config) *Server {
 	s.initMux(config)
 	s.DefaultBackend = backend.CreateBackend(config.BackendUrl)
 
-	logger.Info("Starting server...",
+	slog.Info("Starting server...",
 		"backendUrl", config.BackendUrl,
 		"websocketPath", config.WebSocketPath,
 		"frontendAddr", config.WebSocketListener,
@@ -103,7 +101,7 @@ func (s *Server) Start(ctx context.Context) {
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	id := uuid.NewString()
-	handler := frontend.NewWsHandler(*slog.Default().With("category", "frontend", "sessionId", id), id)
+	handler := frontend.NewWsHandler(*slog.Default().With("sessionId", id), id)
 
 	s.sessions[id] = session.NewSession(session.SessionParams{
 		Id:           id,
@@ -111,7 +109,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		ReplyChannel: fmt.Sprintf("%s/%s", s.replyUrl, id),
 		QueryString:  r.URL.RawQuery,
 		Connection:   handler,
-		Logger:       *slog.Default().With("category", "session", "sessionId", id),
+		Logger:       *slog.Default().With("sessionId", id),
 	})
 
 	m.ActiveSessionsGauge.Inc()
@@ -122,7 +120,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	go s.sessions[id].Receive()
 	err := handler.Handle(w, r, w.Header())
 	if err != nil {
-		logger.Error("Error while handling WebSocket connection", "error", err)
+		slog.Error("Error while handling WebSocket connection", "error", err)
 	}
 }
 
@@ -136,7 +134,7 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		err := json.NewEncoder(w).Encode(SessionResponse{Success: false, Message: "NOT_FOUND"})
 		if err != nil {
-			logger.Error("Error while sending response", "error", err)
+			slog.Error("Error while sending response", "error", err)
 		}
 		return
 	}
@@ -144,7 +142,7 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 	if len(body) > 0 {
 		err := session.Send(body)
 		if err != nil {
-			logger.Error("Error while sending message", "error", err)
+			slog.Error("Error while sending message", "error", err)
 		}
 	}
 
@@ -152,14 +150,14 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 		err := session.Close()
 
 		if err != nil {
-			logger.Error("Error while closing session", "error", err)
+			slog.Error("Error while closing session", "error", err)
 		}
 	}
 
 	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode(SessionResponse{Success: true})
 	if err != nil {
-		logger.Error("Error while sending response", "error", err)
+		slog.Error("Error while sending response", "error", err)
 	}
 }
 
