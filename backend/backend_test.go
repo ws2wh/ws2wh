@@ -3,7 +3,6 @@ package backend
 import (
 	"bytes"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"testing"
@@ -26,7 +25,6 @@ func TestWebhookSuccess(t *testing.T) {
 	wh := WebhookBackend{
 		url:    "http://backend/wh/" + uuid.NewString(),
 		client: &fc,
-		logger: *slog.Default(),
 	}
 	msg := BackendMessage{
 		SessionId:    uuid.NewString(),
@@ -70,7 +68,6 @@ func TestWebhookSuccessWithPayload(t *testing.T) {
 	wh := WebhookBackend{
 		url:    "http://backend/wh/" + uuid.NewString(),
 		client: &fc,
-		logger: *slog.Default(),
 	}
 	msg := BackendMessage{
 		SessionId:    uuid.NewString(),
@@ -99,7 +96,6 @@ func TestWebhookClientError(t *testing.T) {
 	wh := WebhookBackend{
 		url:    "http://backend/wh/" + uuid.NewString(),
 		client: &fc,
-		logger: *slog.Default(),
 	}
 	cbCount := 0
 
@@ -128,7 +124,6 @@ func TestWebhookServiceError(t *testing.T) {
 	wh := WebhookBackend{
 		url:    "http://backend/wh/" + uuid.NewString(),
 		client: &fc,
-		logger: *slog.Default(),
 	}
 	cbCount := 0
 

@@ -42,7 +42,7 @@ func NewSession(params SessionParams) *Session {
 // message contains the raw bytes to send to the client
 // Returns an error if sending the message fails
 func (s *Session) Send(message []byte) error {
-	s.Logger.Debug("Sending message to client", "sessionId", s.Id, "payload", string(message), "queryString", s.QueryString)
+	s.Logger.Debug("Sending message to client", "payload", string(message), "queryString", s.QueryString)
 
 	return s.Connection.Send(message)
 }
@@ -61,16 +61,16 @@ func (s *Session) Close() error {
 // - Notifies the backend when the client disconnects
 // - Cleans up the session when done
 func (s *Session) Receive() {
-	s.Logger.Debug("Waiting for connection signal", "sessionId", s.Id)
+	s.Logger.Debug("Waiting for connection signal")
 	connSignal := <-s.Connection.Signal()
-	s.Logger.Debug("Received connection signal", "sessionId", s.Id, "signal", connSignal)
+	s.Logger.Debug("Received connection signal", "signal", connSignal)
 	if connSignal == ConnectionClosedSignal {
-		s.Logger.Info("Session closed due to connection failure", "sessionId", s.Id)
+		s.Logger.Info("Session closed due to connection failure")
 		return
 	}
 
 	if connSignal != ConnectionReadySignal {
-		s.Logger.Error("Session closed due to unexpected connection signal", "sessionId", s.Id, "signal", connSignal)
+		s.Logger.Error("Session closed due to unexpected connection signal", "signal", connSignal)
 		return
 	}
 
@@ -86,14 +86,14 @@ func (s *Session) Receive() {
 
 	err := s.Backend.Send(msg, s)
 	if err != nil {
-		s.Logger.Error("Error while sending client connected message", "sessionId", s.Id, "error", err)
+		s.Logger.Error("Error while sending client connected message", "error", err)
 	}
 	msg.Event = backend.ClientDisconnected
 	defer func() {
-		s.Logger.Debug("Sending client disconnected message", "sessionId", s.Id, "queryString", s.QueryString)
+		s.Logger.Debug("Sending client disconnected message", "queryString", s.QueryString)
 		err := s.Backend.Send(msg, s)
 		if err != nil {
-			s.Logger.Error("Error while sending client disconnected message", "sessionId", s.Id, "error", err)
+			s.Logger.Error("Error while sending client disconnected message", "error", err)
 		}
 	}()
 
@@ -101,7 +101,7 @@ loop:
 	for {
 		select {
 		case incomingMsg := <-s.Connection.Receiver():
-			s.Logger.Debug("Received message from client, forwarding to backend", "sessionId", s.Id, "payload", string(incomingMsg), "queryString", s.QueryString)
+			s.Logger.Debug("Received message from client, forwarding to backend", "payload", string(incomingMsg), "queryString", s.QueryString)
 			err := s.Backend.Send(backend.BackendMessage{
 				SessionId:    s.Id,
 				ReplyChannel: s.ReplyChannel,
@@ -110,7 +110,7 @@ loop:
 				QueryString:  s.QueryString,
 			}, s)
 			if err != nil {
-				s.Logger.Error("Error while sending message received message", "sessionId", s.Id, "error", err)
+				s.Logger.Error("Error while sending message received message", "error", err)
 			}
 		case <-s.Connection.Signal():
 			s.Logger.Info("Session done", "sessionId", s.Id)

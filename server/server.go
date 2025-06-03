@@ -9,7 +9,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/google/uuid"
@@ -20,9 +19,7 @@ import (
 	"github.com/ws2wh/ws2wh/session"
 )
 
-// TODO: move to new package, set default logger
-var logHandler = slog.NewJSONHandler(os.Stdout, nil)
-var logger = slog.New(logHandler)
+var logger = slog.Default().With("category", "server")
 
 // Server handles WebSocket connections and forwards messages to a configured backend
 type Server struct {
@@ -53,7 +50,7 @@ func CreateServerWithConfig(config *Config) *Server {
 	}
 
 	s.initMux(config)
-	s.DefaultBackend = backend.CreateBackend(config.BackendUrl, *slog.New(logHandler))
+	s.DefaultBackend = backend.CreateBackend(config.BackendUrl)
 
 	logger.Info("Starting server...",
 		"backendUrl", config.BackendUrl,
@@ -72,23 +69,6 @@ func (s *Server) initMux(config *Config) {
 
 	s.httpHandler = router
 }
-
-// func (s *Server) buildEchoStack(config *Config) http.Handler {
-// 	// TODO: replace echo stack with gorilla mux
-// 	es := echo.New()
-// 	es.HideBanner = true
-// 	es.HidePort = true
-// 	es.Logger.SetLevel(config.LogLevel)
-
-// 	es.Use(middleware.Logger())
-// 	es.Use(middleware.Recover())
-
-// 	replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(config.ReplyChannelConfig.PathPrefix, "/"))
-// 	es.GET(config.WebSocketPath, s.handle)
-// 	es.POST(replyPath, s.send)
-
-// 	return es
-// }
 
 // Start begins listening for connections on the configured address
 func (s *Server) Start(ctx context.Context) {
@@ -123,7 +103,7 @@ func (s *Server) Start(ctx context.Context) {
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	id := uuid.NewString()
-	handler := frontend.NewWsHandler(*logger, id)
+	handler := frontend.NewWsHandler(*slog.Default().With("category", "frontend", "sessionId", id), id)
 
 	s.sessions[id] = session.NewSession(session.SessionParams{
 		Id:           id,
@@ -131,7 +111,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		ReplyChannel: fmt.Sprintf("%s/%s", s.replyUrl, id),
 		QueryString:  r.URL.RawQuery,
 		Connection:   handler,
-		Logger:       *logger,
+		Logger:       *slog.Default().With("category", "session", "sessionId", id),
 	})
 
 	m.ActiveSessionsGauge.Inc()

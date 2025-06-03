@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/ws2wh/ws2wh/cmd/logger"
 	"github.com/ws2wh/ws2wh/cmd/ws2wh/flags"
 	"github.com/ws2wh/ws2wh/metrics"
 	"github.com/ws2wh/ws2wh/server"
@@ -13,6 +14,7 @@ import (
 func main() {
 	// TODO: need to create integration/smoke tests for all listeners loaded from config
 	config := flags.LoadConfig()
+	logger.InitLogger(config)
 
 	ctx, cancel := context.WithCancel(context.Background())
 

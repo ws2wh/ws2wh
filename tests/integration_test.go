@@ -4,6 +4,7 @@ package tests
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"net/http"
 	"testing"
 	"time"
@@ -12,6 +13,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/ws2wh/ws2wh/backend"
+	"github.com/ws2wh/ws2wh/cmd/logger"
+	"github.com/ws2wh/ws2wh/server"
 )
 
 const (
@@ -27,6 +30,11 @@ const (
 // 5. Client disconnects and backend is notified
 // 6. New client connects and backend terminates the session
 func TestWebsocketToWebhook(t *testing.T) {
+
+	logger.InitLogger(&server.Config{
+		LogLevel: slog.LevelDebug,
+	})
+
 	wsSrv := CreateTestWs()
 	wsSrv.Start()
 	defer wsSrv.Stop()

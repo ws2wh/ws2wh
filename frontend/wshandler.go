@@ -46,7 +46,7 @@ func (h *WebsocketHandler) Send(data []byte) error {
 	err := h.conn.WriteMessage(websocket.TextMessage, data)
 
 	if err != nil {
-		h.logger.Error("Error while sending message to client", "error", err, "sessionId", h.sessionId)
+		h.logger.Error("Error while sending message to client", "error", err)
 		m.MessageFailureCounter.With(prometheus.Labels{
 			m.OriginLabel: m.OriginValueBackend,
 		}).Inc()
@@ -91,11 +91,11 @@ func (h *WebsocketHandler) Handle(w http.ResponseWriter, r *http.Request, respon
 	defer func() { h.signalChannel <- session.ConnectionClosedSignal }()
 	defer close(h.receiverChannel)
 
-	h.logger.Info("Upgrading HTTP to WS", "sessionId", h.sessionId)
+	h.logger.Info("Upgrading HTTP to WS")
 
 	conn, err := upgrader.Upgrade(w, r, responseHeader)
 	if err != nil {
-		h.logger.Error("Error while upgrading connection", "error", err, "sessionId", h.sessionId)
+		h.logger.Error("Error while upgrading connection", "error", err)
 		return err
 	}
 
@@ -110,7 +110,7 @@ func (h *WebsocketHandler) Handle(w http.ResponseWriter, r *http.Request, respon
 			return h.handleReadMessageErr(err)
 		}
 
-		h.logger.Debug("Received message", "sessionId", h.sessionId, "data", string(msg))
+		h.logger.Debug("Received message", "data", string(msg))
 		h.receiverChannel <- msg
 	}
 }
@@ -126,7 +126,7 @@ func (h *WebsocketHandler) handleReadMessageErr(err error) error {
 		m.DisconnectCounter.With(prometheus.Labels{
 			m.OriginLabel: m.OriginValueBackend,
 		}).Inc()
-		h.logger.Info("Backend closed connection", "sessionId", h.sessionId)
+		h.logger.Info("Backend closed connection")
 		return nil
 	}
 
@@ -135,7 +135,7 @@ func (h *WebsocketHandler) handleReadMessageErr(err error) error {
 			m.OriginLabel: m.OriginValueClient,
 		}).Inc()
 
-		h.logger.Info("Client closed connection", "sessionId", h.sessionId)
+		h.logger.Info("Client closed connection")
 		return nil
 	}
 
@@ -143,7 +143,7 @@ func (h *WebsocketHandler) handleReadMessageErr(err error) error {
 		m.OriginLabel: m.OriginValueClient,
 	}).Inc()
 
-	h.logger.Error("Error while reading message", "error", err, "sessionId", h.sessionId)
+	h.logger.Error("Error while reading message", "error", err)
 
 	return err
 }
