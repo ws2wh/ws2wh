@@ -6,18 +6,23 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/labstack/gommon/log"
 	"github.com/ws2wh/ws2wh/backend"
 	"github.com/ws2wh/ws2wh/frontend"
 	m "github.com/ws2wh/ws2wh/metrics/directory"
 	"github.com/ws2wh/ws2wh/session"
 )
+
+// TODO: move to new package, set default logger
+var logHandler = slog.NewJSONHandler(os.Stdout, nil)
+var logger = slog.New(logHandler)
 
 // Server handles WebSocket connections and forwards messages to a configured backend
 type Server struct {
@@ -26,7 +31,7 @@ type Server struct {
 	backendUrl     string
 	replyUrl       string
 	sessions       map[string]*session.Session
-	httpHandler    *echo.Echo
+	httpHandler    http.Handler
 	tlsCertPath    string
 	tlsKeyPath     string
 }
@@ -47,45 +52,47 @@ func CreateServerWithConfig(config *Config) *Server {
 		tlsKeyPath:   config.TlsConfig.TlsKeyPath,
 	}
 
-	s.httpHandler = buildEchoStack(config.LogLevel)
-	s.DefaultBackend = backend.CreateBackend(config.BackendUrl, s.httpHandler.Logger)
-	replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(config.ReplyChannelConfig.PathPrefix, "/"))
-	s.httpHandler.GET(config.WebSocketPath, s.handle)
-	s.httpHandler.POST(replyPath, s.send)
+	s.httpHandler = s.buildEchoStack(config)
+	s.DefaultBackend = backend.CreateBackend(config.BackendUrl, *slog.New(logHandler))
+	// replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(config.ReplyChannelConfig.PathPrefix, "/"))
+	// s.httpHandler.GET(config.WebSocketPath, s.handle)
+	// s.httpHandler.POST(replyPath, s.send)
 
-	s.httpHandler.Logger.Infoj(map[string]interface{}{
-		"message":       "Starting server...",
-		"backendUrl":    config.BackendUrl,
-		"websocketPath": config.WebSocketPath,
-		"frontendAddr":  config.WebSocketListener,
-	})
+	logger.Info("Starting server...",
+		"backendUrl", config.BackendUrl,
+		"websocketPath", config.WebSocketPath,
+		"frontendAddr", config.WebSocketListener,
+	)
 
 	return &s
 }
 
-func buildEchoStack(logLevel log.Lvl) *echo.Echo {
+func (s *Server) buildEchoStack(config *Config) http.Handler {
 	// TODO: replace echo stack with gorilla mux
 	// TODO: replace echo logger (gommon/log) with slog
 	es := echo.New()
 	es.HideBanner = true
 	es.HidePort = true
-	es.Logger.SetLevel(logLevel)
+	es.Logger.SetLevel(config.LogLevel)
 
 	es.Use(middleware.Logger())
 	es.Use(middleware.Recover())
+
+	replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(config.ReplyChannelConfig.PathPrefix, "/"))
+	es.GET(config.WebSocketPath, s.handle)
+	es.POST(replyPath, s.send)
 
 	return es
 }
 
 // Start begins listening for connections on the configured address
 func (s *Server) Start(ctx context.Context) {
-	e := s.httpHandler
 	server := &http.Server{
 		Addr: s.frontendAddr,
 		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
 		},
-		Handler: e,
+		Handler: s.httpHandler,
 	}
 
 	go func() {
@@ -97,19 +104,14 @@ func (s *Server) Start(ctx context.Context) {
 		}
 
 		if err != nil {
-			e.Logger.Errorj(map[string]interface{}{
-				"error": err,
-			})
+			slog.Error("Http server stopped", "err", err)
 		}
 	}()
 
 	go func() {
 		<-ctx.Done()
 		if err := server.Shutdown(context.Background()); err != nil {
-			e.Logger.Errorj(map[string]interface{}{
-				"message": "Error during gracefully server shutdown",
-				"error":   err,
-			})
+			slog.Error("Error during gracefully server shutdown", "err", err)
 		}
 	}()
 }
