@@ -3,11 +3,11 @@ package flags
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"strings"
 
-	"github.com/labstack/gommon/log"
 	"github.com/ws2wh/ws2wh/metrics"
 	"github.com/ws2wh/ws2wh/server"
 )
@@ -18,7 +18,7 @@ func LoadConfig() *server.Config {
 	replyPathPrefix := flag.String("r", getEnvOrDefault("REPLY_PATH_PREFIX", "/reply"), "Backend reply path prefix")
 	websocketListener := flag.String("l", fmt.Sprintf(":%s", getEnvOrDefault("WS_PORT", "3000")), "Websocket frontend listener address")
 	websocketPath := flag.String("p", getEnvOrDefault("WS_PATH", "/"), "Websocket upgrade path")
-	logLevel := flag.String("v", getEnvOrDefault("LOG_LEVEL", "INFO"), "Log level (DEBUG,	INFO, WARN, ERROR, OFF; default: INFO)")
+	logLevel := flag.String("v", getEnvOrDefault("LOG_LEVEL", "INFO"), "Log level (DEBUG,	INFO, WARN, ERROR; default: INFO)")
 	hostname := flag.String("h", getEnvOrDefault("REPLY_HOSTNAME", getEnvOrDefault("HOSTNAME", "localhost")), "Hostname to use in reply channel")
 	enableMetrics := flag.String("metrics-enabled", getEnvOrDefault("METRICS_ENABLED", "false"), "Enable Prometheus metrics")
 	metricsPort := flag.String("metrics-port", getEnvOrDefault("METRICS_PORT", "9090"), "Prometheus metrics port")
@@ -30,19 +30,23 @@ func LoadConfig() *server.Config {
 	flag.Parse()
 
 	if *backendUrl == "" {
-		log.Fatalf("Webhook backend URL is required")
+		slog.Error("Webhook backend URL is required")
+		os.Exit(1)
 	}
 	_, e := url.ParseRequestURI(*backendUrl)
 	if e != nil {
-		log.Fatalf("Invalid backend URL: %s", *backendUrl)
+		slog.Error("Invalid backend URL", "error", e)
+		os.Exit(1)
 	}
 
 	if *tlsCertPath != "" && *tlsKeyPath == "" {
-		log.Fatalf("TLS certificate path set but TLS key path not set")
+		slog.Error("TLS certificate path set but TLS key path not set")
+		os.Exit(1)
 	}
 
 	if *tlsCertPath == "" && *tlsKeyPath != "" {
-		log.Fatalf("TLS key path set but TLS certificate path not set")
+		slog.Error("TLS key path set but TLS certificate path not set")
+		os.Exit(1)
 	}
 
 	var replyScheme string
@@ -86,20 +90,18 @@ func getEnvOrDefault(key, fallback string) string {
 	return fallback
 }
 
-func parse(logLevel string) log.Lvl {
+func parse(logLevel string) slog.Level {
 	switch strings.ToUpper(logLevel) {
 	case "DEBUG":
-		return log.DEBUG
+		return slog.LevelDebug
 	case "INFO":
-		return log.INFO
+		return slog.LevelInfo
 	case "WARN":
-		return log.WARN
+		return slog.LevelWarn
 	case "ERROR":
-		return log.ERROR
-	case "OFF":
-		return log.OFF
+		return slog.LevelError
 	}
 
-	log.Warnf("Unknown log level: %s, using INFO instead", logLevel)
-	return log.INFO
+	slog.Warn("Unknown log level, using INFO instead", "logLevel", logLevel)
+	return slog.LevelInfo
 }

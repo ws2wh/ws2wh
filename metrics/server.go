@@ -2,9 +2,8 @@ package metrics
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
-
-	"github.com/labstack/gommon/log"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -23,26 +22,17 @@ func StartMetricsServer(ctx context.Context, config *MetricsConfig) {
 		Handler: mux,
 	}
 
-	log.Infoj(map[string]interface{}{
-		"message": "Starting metrics server",
-		"port":    config.Port,
-		"path":    config.Path,
-	})
+	slog.Info("Starting metrics server", "port", config.Port, "path", config.Path)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Errorj(map[string]interface{}{
-				"message": "Metrics server error",
-				"error":   err,
-			})
+			slog.Error("Metrics server error", "error", err)
 		}
 	}()
 
 	go func() {
 		<-ctx.Done()
-		log.Infoj(map[string]interface{}{
-			"message": "Context cancelled, shutting down metrics server",
-		})
+		slog.Info("Context cancelled, shutting down metrics server")
 		stopMetricsServer()
 	}()
 }
@@ -51,11 +41,7 @@ func stopMetricsServer() {
 	if server == nil {
 		return
 	}
-	log.Infoj(map[string]interface{}{
-		"message": "Stopping metrics server",
-	})
+	slog.Info("Stopping metrics server")
 	server.Shutdown(context.Background())
-	log.Infoj(map[string]interface{}{
-		"message": "Metrics server stopped",
-	})
+	slog.Info("Metrics server stopped")
 }

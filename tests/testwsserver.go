@@ -2,8 +2,8 @@ package tests
 
 import (
 	"context"
+	"log/slog"
 
-	"github.com/labstack/gommon/log"
 	"github.com/ws2wh/ws2wh/metrics"
 	"github.com/ws2wh/ws2wh/server"
 )
@@ -27,7 +27,7 @@ func CreateTestWs() TestWsServer {
 				Scheme:     "http",
 				Port:       "3000",
 			},
-			LogLevel: log.DEBUG,
+			LogLevel: slog.LevelDebug,
 			Hostname: "localhost",
 			MetricsConfig: &metrics.MetricsConfig{
 				Enabled: false,

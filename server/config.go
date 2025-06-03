@@ -2,8 +2,8 @@ package server
 
 import (
 	"fmt"
+	"log/slog"
 
-	"github.com/labstack/gommon/log"
 	"github.com/ws2wh/ws2wh/metrics"
 )
 
@@ -18,7 +18,7 @@ type Config struct {
 	// WebSocketPath is the path where WebSocket connections will be upgraded (default: /)
 	WebSocketPath string
 	// LogLevel sets the logging level (DEBUG, INFO, WARN, ERROR, OFF; default: INFO)
-	LogLevel log.Lvl
+	LogLevel slog.Level
 	// Hostname is used in the reply channel URL (default: localhost)
 	Hostname string
 	// MetricsConfig holds the metrics configuration parameters

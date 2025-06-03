@@ -3,60 +3,69 @@ package tests
 import (
 	"context"
 	"io"
+	"net/http"
 	"testing"
 	"time"
 
-	"github.com/labstack/echo/v4"
+	"github.com/gorilla/mux"
 	"github.com/ws2wh/ws2wh/backend"
 )
 
 type TestWebhook struct {
-	echoStack *echo.Echo
-	messages  chan backend.BackendMessage
-	responses [][]byte
+	httpHandler http.Handler
+	messages    chan backend.BackendMessage
+	responses   [][]byte
+	server      *http.Server
 }
 
 func CreateTestWebhook() *TestWebhook {
+	httpHandler := mux.NewRouter()
 	b := TestWebhook{
-		messages:  make(chan backend.BackendMessage, 100),
-		echoStack: echo.New(),
-		responses: make([][]byte, 0),
+		messages:    make(chan backend.BackendMessage, 100),
+		httpHandler: httpHandler,
+		responses:   make([][]byte, 0),
+		server:      nil,
 	}
 
-	e := b.echoStack
-	e.POST("/", b.handler)
+	httpHandler.Methods("POST").Path("/").HandlerFunc(b.handler)
+	b.server = &http.Server{
+		Addr:    BackendHost,
+		Handler: b.httpHandler,
+	}
 
 	return &b
 }
 
-func (b *TestWebhook) handler(c echo.Context) error {
-	p, _ := io.ReadAll(c.Request().Body)
+func (b *TestWebhook) handler(w http.ResponseWriter, r *http.Request) {
+	p, _ := io.ReadAll(r.Body)
 	msg := backend.BackendMessage{
-		SessionId:    c.Request().Header.Get(backend.SessionIdHeader),
-		ReplyChannel: c.Request().Header.Get(backend.ReplyChannelHeader),
-		Event:        backend.ParseWsEvent(c.Request().Header.Get(backend.EventHeader)),
-		QueryString:  c.Request().Header.Get(backend.QueryStringHeader),
+		SessionId:    r.Header.Get(backend.SessionIdHeader),
+		ReplyChannel: r.Header.Get(backend.ReplyChannelHeader),
+		Event:        backend.ParseWsEvent(r.Header.Get(backend.EventHeader)),
+		QueryString:  r.Header.Get(backend.QueryStringHeader),
 		Payload:      p,
 	}
 
 	b.messages <- msg
 	if len(b.responses) == 0 {
-		c.NoContent(204)
+		w.WriteHeader(http.StatusNoContent)
 	} else {
 		resp := b.responses[0]
 		b.responses = b.responses[1:]
-		c.Blob(200, "text/plain", resp)
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write(resp)
 	}
-
-	return nil
 }
 
 func (b *TestWebhook) Start() {
-	go func() { b.echoStack.Logger.Info(b.echoStack.Start(BackendHost)) }()
+	go func() {
+		b.server.ListenAndServe()
+	}()
 }
 
 func (b *TestWebhook) Stop() {
-	b.echoStack.Shutdown(context.Background())
+	b.server.Shutdown(context.Background())
 }
 
 func (b *TestWebhook) WaitForMessage(t *testing.T, timeout time.Duration) backend.BackendMessage {

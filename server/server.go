@@ -4,6 +4,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,8 +13,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/gorilla/mux"
 	"github.com/ws2wh/ws2wh/backend"
 	"github.com/ws2wh/ws2wh/frontend"
 	m "github.com/ws2wh/ws2wh/metrics/directory"
@@ -52,11 +52,8 @@ func CreateServerWithConfig(config *Config) *Server {
 		tlsKeyPath:   config.TlsConfig.TlsKeyPath,
 	}
 
-	s.httpHandler = s.buildEchoStack(config)
+	s.initMux(config)
 	s.DefaultBackend = backend.CreateBackend(config.BackendUrl, *slog.New(logHandler))
-	// replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(config.ReplyChannelConfig.PathPrefix, "/"))
-	// s.httpHandler.GET(config.WebSocketPath, s.handle)
-	// s.httpHandler.POST(replyPath, s.send)
 
 	logger.Info("Starting server...",
 		"backendUrl", config.BackendUrl,
@@ -67,23 +64,31 @@ func CreateServerWithConfig(config *Config) *Server {
 	return &s
 }
 
-func (s *Server) buildEchoStack(config *Config) http.Handler {
-	// TODO: replace echo stack with gorilla mux
-	// TODO: replace echo logger (gommon/log) with slog
-	es := echo.New()
-	es.HideBanner = true
-	es.HidePort = true
-	es.Logger.SetLevel(config.LogLevel)
+func (s *Server) initMux(config *Config) {
+	router := mux.NewRouter()
+	router.Path(config.WebSocketPath).Methods("GET").HandlerFunc(s.handle)
+	replyPath := fmt.Sprintf("%s/{id}", strings.TrimRight(config.ReplyChannelConfig.PathPrefix, "/"))
+	router.Path(replyPath).Methods("POST").HandlerFunc(s.send)
 
-	es.Use(middleware.Logger())
-	es.Use(middleware.Recover())
-
-	replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(config.ReplyChannelConfig.PathPrefix, "/"))
-	es.GET(config.WebSocketPath, s.handle)
-	es.POST(replyPath, s.send)
-
-	return es
+	s.httpHandler = router
 }
+
+// func (s *Server) buildEchoStack(config *Config) http.Handler {
+// 	// TODO: replace echo stack with gorilla mux
+// 	es := echo.New()
+// 	es.HideBanner = true
+// 	es.HidePort = true
+// 	es.Logger.SetLevel(config.LogLevel)
+
+// 	es.Use(middleware.Logger())
+// 	es.Use(middleware.Recover())
+
+// 	replyPath := fmt.Sprintf("%s/:id", strings.TrimRight(config.ReplyChannelConfig.PathPrefix, "/"))
+// 	es.GET(config.WebSocketPath, s.handle)
+// 	es.POST(replyPath, s.send)
+
+// 	return es
+// }
 
 // Start begins listening for connections on the configured address
 func (s *Server) Start(ctx context.Context) {
@@ -116,18 +121,17 @@ func (s *Server) Start(ctx context.Context) {
 	}()
 }
 
-func (s *Server) handle(c echo.Context) error {
+func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	id := uuid.NewString()
-	logger := c.Logger()
-	handler := frontend.NewWsHandler(logger, id)
+	handler := frontend.NewWsHandler(*logger, id)
 
 	s.sessions[id] = session.NewSession(session.SessionParams{
 		Id:           id,
 		Backend:      s.DefaultBackend,
 		ReplyChannel: fmt.Sprintf("%s/%s", s.replyUrl, id),
-		QueryString:  c.QueryString(),
+		QueryString:  r.URL.RawQuery,
 		Connection:   handler,
-		Logger:       logger,
+		Logger:       *logger,
 	})
 
 	m.ActiveSessionsGauge.Inc()
@@ -136,54 +140,47 @@ func (s *Server) handle(c echo.Context) error {
 	defer delete(s.sessions, id)
 
 	go s.sessions[id].Receive()
-	err := handler.Handle(c.Response().Writer, c.Request(), c.Response().Header())
+	err := handler.Handle(w, r, w.Header())
 	if err != nil {
-		c.Logger().Errorj(map[string]interface{}{
-			"message": "Error while handling WebSocket connection",
-			"error":   err,
-		})
+		logger.Error("Error while handling WebSocket connection", "error", err)
 	}
-	return nil
 }
 
-func (s *Server) send(c echo.Context) error {
-	id := c.Param("id")
+func (s *Server) send(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
 	var body []byte
-	body, _ = io.ReadAll(c.Request().Body)
+	body, _ = io.ReadAll(r.Body)
 	session := s.sessions[id]
 
 	if session == nil {
-		err := c.JSON(http.StatusNotFound, SessionResponse{Success: false, Message: "NOT_FOUND"})
+		w.WriteHeader(http.StatusNotFound)
+		err := json.NewEncoder(w).Encode(SessionResponse{Success: false, Message: "NOT_FOUND"})
 		if err != nil {
-			c.Logger().Errorj(map[string]interface{}{
-				"message": "Error while sending response",
-				"error":   err,
-			})
+			logger.Error("Error while sending response", "error", err)
 		}
+		return
 	}
 
 	if len(body) > 0 {
 		err := session.Send(body)
 		if err != nil {
-			c.Logger().Errorj(map[string]interface{}{
-				"message": "Error while sending message",
-				"error":   err,
-			})
+			logger.Error("Error while sending message", "error", err)
 		}
 	}
 
-	if c.Request().Header.Get(backend.CommandHeader) == backend.TerminateSessionCommand {
+	if r.Header.Get(backend.CommandHeader) == backend.TerminateSessionCommand {
 		err := session.Close()
 
 		if err != nil {
-			c.Logger().Errorj(map[string]interface{}{
-				"message": "Error while closing session",
-				"error":   err,
-			})
+			logger.Error("Error while closing session", "error", err)
 		}
 	}
 
-	return c.JSON(http.StatusOK, SessionResponse{Success: true})
+	w.WriteHeader(http.StatusOK)
+	err := json.NewEncoder(w).Encode(SessionResponse{Success: true})
+	if err != nil {
+		logger.Error("Error while sending response", "error", err)
+	}
 }
 
 // SessionResponse represents the JSON response format for session-related operations

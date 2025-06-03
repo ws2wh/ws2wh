@@ -4,10 +4,10 @@
 package frontend
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gorilla/websocket"
-	"github.com/labstack/echo/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	m "github.com/ws2wh/ws2wh/metrics/directory"
 	"github.com/ws2wh/ws2wh/session"
@@ -19,7 +19,7 @@ var upgrader = websocket.Upgrader{
 
 // NewWsHandler creates a new WebsocketHandler with initialized channels
 // for receiving messages and handling connection termination
-func NewWsHandler(logger echo.Logger, id string) *WebsocketHandler {
+func NewWsHandler(logger slog.Logger, id string) *WebsocketHandler {
 	h := WebsocketHandler{
 		receiverChannel: make(chan []byte, 64),
 		signalChannel:   make(chan session.ConnectionSignal, 2),
@@ -36,7 +36,7 @@ type WebsocketHandler struct {
 	receiverChannel chan []byte
 	signalChannel   chan session.ConnectionSignal
 	conn            *websocket.Conn
-	logger          echo.Logger
+	logger          slog.Logger
 	sessionId       string
 	closed          bool
 }
@@ -46,11 +46,7 @@ func (h *WebsocketHandler) Send(data []byte) error {
 	err := h.conn.WriteMessage(websocket.TextMessage, data)
 
 	if err != nil {
-		h.logger.Errorj(map[string]interface{}{
-			"message":   "Error while sending message to client",
-			"sessionId": h.sessionId,
-			"error":     err,
-		})
+		h.logger.Error("Error while sending message to client", "error", err, "sessionId", h.sessionId)
 		m.MessageFailureCounter.With(prometheus.Labels{
 			m.OriginLabel: m.OriginValueBackend,
 		}).Inc()
@@ -95,18 +91,11 @@ func (h *WebsocketHandler) Handle(w http.ResponseWriter, r *http.Request, respon
 	defer func() { h.signalChannel <- session.ConnectionClosedSignal }()
 	defer close(h.receiverChannel)
 
-	h.logger.Infoj(map[string]interface{}{
-		"message":   "Upgrading HTTP to WS",
-		"sessionId": h.sessionId,
-	})
+	h.logger.Info("Upgrading HTTP to WS", "sessionId", h.sessionId)
 
 	conn, err := upgrader.Upgrade(w, r, responseHeader)
 	if err != nil {
-		h.logger.Errorj(map[string]interface{}{
-			"message":   "Error while upgrading connection",
-			"sessionId": h.sessionId,
-			"error":     err,
-		})
+		h.logger.Error("Error while upgrading connection", "error", err, "sessionId", h.sessionId)
 		return err
 	}
 
@@ -121,11 +110,7 @@ func (h *WebsocketHandler) Handle(w http.ResponseWriter, r *http.Request, respon
 			return h.handleReadMessageErr(err)
 		}
 
-		h.logger.Debugj(map[string]interface{}{
-			"message":   "Received message",
-			"sessionId": h.sessionId,
-			"data":      string(msg),
-		})
+		h.logger.Debug("Received message", "sessionId", h.sessionId, "data", string(msg))
 		h.receiverChannel <- msg
 	}
 }
@@ -141,10 +126,7 @@ func (h *WebsocketHandler) handleReadMessageErr(err error) error {
 		m.DisconnectCounter.With(prometheus.Labels{
 			m.OriginLabel: m.OriginValueBackend,
 		}).Inc()
-		h.logger.Infoj(map[string]interface{}{
-			"message":   "Backend closed connection",
-			"sessionId": h.sessionId,
-		})
+		h.logger.Info("Backend closed connection", "sessionId", h.sessionId)
 		return nil
 	}
 
@@ -153,10 +135,7 @@ func (h *WebsocketHandler) handleReadMessageErr(err error) error {
 			m.OriginLabel: m.OriginValueClient,
 		}).Inc()
 
-		h.logger.Infoj(map[string]interface{}{
-			"message":   "Client closed connection",
-			"sessionId": h.sessionId,
-		})
+		h.logger.Info("Client closed connection", "sessionId", h.sessionId)
 		return nil
 	}
 
@@ -164,11 +143,7 @@ func (h *WebsocketHandler) handleReadMessageErr(err error) error {
 		m.OriginLabel: m.OriginValueClient,
 	}).Inc()
 
-	h.logger.Errorj(map[string]interface{}{
-		"message":   "Error while reading message",
-		"sessionId": h.sessionId,
-		"error":     err,
-	})
+	h.logger.Error("Error while reading message", "error", err, "sessionId", h.sessionId)
 
 	return err
 }
