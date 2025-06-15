@@ -28,9 +28,11 @@ func LoadConfig() *server.Config {
 	tlsCertPath := flag.String("tls-cert-path", getEnvOrDefault("TLS_CERT_PATH", ""), "(Optional) TLS certificate path (PEM format). Required if TLS key path set.")
 	tlsKeyPath := flag.String("tls-key-path", getEnvOrDefault("TLS_KEY_PATH", ""), "(Optional) TLS key path (PEM format). Required if TLS certificate path set.")
 	jwtEnable := flag.String("jwt-enabled", getEnvOrDefault("JWT_ENABLED", "false"), "Enable JWT authentication")
-	jwtSecret := flag.String("jwt-secret", getEnvOrDefault("JWT_SECRET", ""), "JWT secret")
 	jwtIssuer := flag.String("jwt-issuer", getEnvOrDefault("JWT_ISSUER", ""), "JWT issuer")
 	jwtAudience := flag.String("jwt-audience", getEnvOrDefault("JWT_AUDIENCE", ""), "JWT audience")
+	jwtSecretType := flag.String("jwt-secret-type", getEnvOrDefault("JWT_SECRET_TYPE", "jwks-url"), "JWT secret type (jwks-file, jwks-url, openid)")
+	jwtSecretPath := flag.String("jwt-secret-path", getEnvOrDefault("JWT_SECRET_PATH", ""), "Path to JWT secret (file path or URL depending on secret type)")
+	jwtQueryParam := flag.String("jwt-query-param", getEnvOrDefault("JWT_QUERY_PARAM", "token"), "Query parameter name for JWT token")
 
 	flag.Parse()
 
@@ -86,10 +88,11 @@ func LoadConfig() *server.Config {
 			TlsKeyPath:  *tlsKeyPath,
 		},
 		JwtConfig: &jwt.JwtConfig{
-			Enabled:  *jwtEnable == "true",
-			Secret:   *jwtSecret,
-			Issuer:   *jwtIssuer,
-			Audience: *jwtAudience,
+			Enabled:      *jwtEnable == "true",
+			QueryParam:   *jwtQueryParam,
+			SecretSource: createSecretProvider(*jwtSecretType, *jwtSecretPath),
+			Issuer:       *jwtIssuer,
+			Audience:     *jwtAudience,
 		},
 	}
 }
@@ -115,4 +118,25 @@ func parse(logLevel string) slog.Level {
 
 	slog.Warn("Unknown log level, using INFO instead", "logLevel", logLevel)
 	return slog.LevelInfo
+}
+
+func createSecretProvider(secretType, secretPath string) jwt.KeyProvider {
+	switch secretType {
+	case "jwks-file":
+		return &jwt.JWKSFileProvider{
+			FilePath: secretPath,
+		}
+	case "jwks-url":
+		return &jwt.JWKSURLProvider{
+			URL: secretPath,
+		}
+	case "openid":
+		return &jwt.OpenIDConfigProvider{
+			Issuer: secretPath,
+		}
+	default:
+		// TODO: should we fail here?
+		slog.Warn("Unknown JWT secret type, using no secret", "type", secretType)
+		return nil
+	}
 }

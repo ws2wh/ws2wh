@@ -1,16 +1,10 @@
 package jwt
 
 import (
+	"fmt"
+
 	"net/http"
 )
-
-type JwtConfig struct {
-	Enabled    bool
-	QueryParam string
-	Secret     string
-	Issuer     string
-	Audience   string
-}
 
 type JwtAuthorizer struct {
 	config *JwtConfig
@@ -21,7 +15,6 @@ func NewJwtAuthorizer(config *JwtConfig) *JwtAuthorizer {
 }
 
 func (a *JwtAuthorizer) Authorize(next http.Handler) http.Handler {
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := r.URL.Query().Get(a.config.QueryParam)
 		if token == "" {
@@ -29,14 +22,16 @@ func (a *JwtAuthorizer) Authorize(next http.Handler) http.Handler {
 			return
 		}
 
-		// TODO validate jwt token
-		// TODO requires jwt key to be loaded from somewhere - possible sources:
-		// - raw key as param
-		// - jwks file
-		// - jwks url
-		// - issuer with standard .well-known/openid-configuration url
+		secret, err := a.config.SecretSource.GetKeys()
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
 
-		// TODO validate jwt token
+		// TODO: remove this
+		fmt.Println("secret", secret)
+
+		// TODO: Use secret to validate JWT token
 
 		next.ServeHTTP(w, r)
 	})
