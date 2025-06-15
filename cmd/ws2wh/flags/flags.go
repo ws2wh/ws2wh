@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ws2wh/ws2wh/http-middleware/jwt"
 	"github.com/ws2wh/ws2wh/metrics"
 	"github.com/ws2wh/ws2wh/server"
 )
@@ -26,6 +27,10 @@ func LoadConfig() *server.Config {
 	tlsEnabled := flag.String("tls-enabled", getEnvOrDefault("TLS_ENABLED", "false"), "Enable TLS")
 	tlsCertPath := flag.String("tls-cert-path", getEnvOrDefault("TLS_CERT_PATH", ""), "(Optional) TLS certificate path (PEM format). Required if TLS key path set.")
 	tlsKeyPath := flag.String("tls-key-path", getEnvOrDefault("TLS_KEY_PATH", ""), "(Optional) TLS key path (PEM format). Required if TLS certificate path set.")
+	jwtEnable := flag.String("jwt-enabled", getEnvOrDefault("JWT_ENABLED", "false"), "Enable JWT authentication")
+	jwtSecret := flag.String("jwt-secret", getEnvOrDefault("JWT_SECRET", ""), "JWT secret")
+	jwtIssuer := flag.String("jwt-issuer", getEnvOrDefault("JWT_ISSUER", ""), "JWT issuer")
+	jwtAudience := flag.String("jwt-audience", getEnvOrDefault("JWT_AUDIENCE", ""), "JWT audience")
 
 	flag.Parse()
 
@@ -79,6 +84,12 @@ func LoadConfig() *server.Config {
 			Enabled:     *tlsEnabled == "true",
 			TlsCertPath: *tlsCertPath,
 			TlsKeyPath:  *tlsKeyPath,
+		},
+		JwtConfig: &jwt.JwtConfig{
+			Enabled:  *jwtEnable == "true",
+			Secret:   *jwtSecret,
+			Issuer:   *jwtIssuer,
+			Audience: *jwtAudience,
 		},
 	}
 }

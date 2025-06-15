@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/ws2wh/ws2wh/http-middleware/jwt"
 	"github.com/ws2wh/ws2wh/metrics"
 )
 
@@ -25,6 +26,8 @@ type Config struct {
 	MetricsConfig *metrics.MetricsConfig
 	// TlsConfig holds the TLS configuration parameters
 	TlsConfig *TlsConfig
+	// JwtConfig holds the JWT configuration parameters
+	JwtConfig *jwt.JwtConfig
 }
 
 type TlsConfig struct {
