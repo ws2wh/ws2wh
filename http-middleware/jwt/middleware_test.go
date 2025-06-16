@@ -40,7 +40,7 @@ func TestJwtAuthorizer(t *testing.T) {
 	handlerCalled := false
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlerCalled = true
-		payload := r.Header.Get("X-JWT-Payload")
+		payload := r.Context().Value(JwtPayloadKey{}).(string)
 		assert.NotEmpty(t, payload)
 		w.WriteHeader(http.StatusOK)
 	})
@@ -124,7 +124,7 @@ func TestJwtAuthorizerWithDifferentAlgorithms(t *testing.T) {
 	handlerCalled := false
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlerCalled = true
-		payload := r.Header.Get("X-JWT-Payload")
+		payload := r.Context().Value(JwtPayloadKey{}).(string)
 		assert.NotEmpty(t, payload)
 		w.WriteHeader(http.StatusOK)
 	})

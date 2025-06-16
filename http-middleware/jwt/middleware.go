@@ -1,12 +1,15 @@
 package jwt
 
 import (
+	"context"
 	"log/slog"
-
 	"net/http"
 
 	"github.com/go-jose/go-jose/v4"
 )
+
+// JwtPayloadKey is the context key for storing JWT payload
+type JwtPayloadKey struct{}
 
 type JwtAuthorizer struct {
 	queryParam string
@@ -62,7 +65,8 @@ func (a *JwtAuthorizer) Authorize(next http.Handler) http.Handler {
 			return
 		}
 
-		r.Header.Set("X-JWT-Payload", string(t))
+		ctx := context.WithValue(r.Context(), JwtPayloadKey{}, string(t))
+		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)
 	})
