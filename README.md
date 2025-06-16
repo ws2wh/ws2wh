@@ -18,11 +18,18 @@ Parameters can be provided either as command-line flags or environment variables
 | `-p` | `WS_PATH` | `/` | Path where WebSocket connections will be upgraded |
 | `-v` | `LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARN, ERROR, OFF) |
 | `-h` | `REPLY_HOSTNAME` or `HOSTNAME` | `localhost` | Hostname to use in reply channel |
+| `-metrics-enabled` | `METRICS_ENABLED` | `false` | Enables Prometheus metrics endpoint |
 | `-metrics-port` | `METRICS_PORT` | `9090` | Prometheus metrics port |
 | `-metrics-path` | `METRICS_PATH` | `/metrics` | Prometheus metrics path |
-| `-metrics-enabled` | `METRICS_ENABLED` | `false` | Enables Prometheus metrics endpoint |
+| `-tls-enabled` | `TLS_ENABLED` | `false` | Enables TLS |
 | `-tls-cert-path` | `TLS_CERT_PATH` | (optional) | TLS certificate path (PEM format). Required if TLS key path set. |
 | `-tls-key-path` | `TLS_KEY_PATH` | (optional) | TLS key path (PEM format). Required if TLS certificate path set. |
+| `-jwt-enabled` | `JWT_ENABLED` | `false` | Enables JWT authentication |
+| `-jwt-secret-type` | `JWT_SECRET_TYPE` | `jwks-url` | JWT secret type (jwks-file, jwks-url, openid) |
+| `-jwt-secret-path` | `JWT_SECRET_PATH` | (required if JWT enabled) | Path to JWT secret (file path or URL depending on secret type) |
+| `-jwt-query-param` | `JWT_QUERY_PARAM` | `token` | Query parameter name for JWT token |
+| `-jwt-issuer` | `JWT_ISSUER` | (optional) | JWT issuer |
+| `-jwt-audience` | `JWT_AUDIENCE` | (optional) | JWT audience |
 
 Example using environment variables:
 
@@ -33,11 +40,18 @@ export WS_PORT=3000
 export WS_PATH=/
 export LOG_LEVEL=INFO
 export REPLY_HOSTNAME=ws.example.com
+export METRICS_ENABLED=true
 export METRICS_PORT=9090
 export METRICS_PATH=/metrics
-export METRICS_ENABLED=true
+export TLS_ENABLED=true
 export TLS_CERT_PATH=./ws.example.com.crt
 export TLS_KEY_PATH=./ws.example.com.key
+export JWT_ENABLED=true
+export JWT_SECRET_TYPE=jwks-url
+export JWT_SECRET_PATH=https://your-domain/.well-known/jwks.json
+export JWT_QUERY_PARAM=token
+export JWT_ISSUER=https://your-issuer
+export JWT_AUDIENCE=your-audience
 
 ws2wh
 ```
@@ -62,6 +76,7 @@ Ws-Session-Id: <unique session identifier>
 Ws-Query-String: <query string from the WS client (if any)>
 Ws-Reply-Channel: <reply URL for this session>
 Ws-Event: <event type>
+Ws-Session-Jwt-Claims: <JSON string of JWT claims from the client (if any)>
 ```
 
 Event types can be:
