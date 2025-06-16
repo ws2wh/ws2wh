@@ -76,6 +76,7 @@ Ws-Session-Id: <unique session identifier>
 Ws-Query-String: <query string from the WS client (if any)>
 Ws-Reply-Channel: <reply URL for this session>
 Ws-Event: <event type>
+Ws-Session-Jwt-Claims: <JSON string of JWT claims from the client (if any)>
 ```
 
 Event types can be:

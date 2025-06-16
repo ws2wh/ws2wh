@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/ws2wh/ws2wh/backend"
 	"github.com/ws2wh/ws2wh/frontend"
+	"github.com/ws2wh/ws2wh/http-middleware/jwt"
 	m "github.com/ws2wh/ws2wh/metrics/directory"
 	"github.com/ws2wh/ws2wh/session"
 )
@@ -103,6 +104,11 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	id := uuid.NewString()
 	handler := frontend.NewWsHandler(*slog.Default().With("sessionId", id), id)
 
+	var jwtClaims *string
+	if claims, ok := r.Context().Value(jwt.JwtClaimsKey{}).(string); ok {
+		jwtClaims = &claims
+	}
+
 	s.sessions[id] = session.NewSession(session.SessionParams{
 		Id:           id,
 		Backend:      s.DefaultBackend,
@@ -110,6 +116,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		QueryString:  r.URL.RawQuery,
 		Connection:   handler,
 		Logger:       *slog.Default().With("sessionId", id),
+		JwtClaims:    jwtClaims,
 	})
 
 	m.ActiveSessionsGauge.Inc()

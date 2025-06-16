@@ -8,8 +8,8 @@ import (
 	"github.com/go-jose/go-jose/v4"
 )
 
-// JwtPayloadKey is the context key for storing JWT payload
-type JwtPayloadKey struct{}
+// JwtClaimsKey is the context key for storing JWT claims
+type JwtClaimsKey struct{}
 
 type JwtAuthorizer struct {
 	queryParam string
@@ -65,7 +65,7 @@ func (a *JwtAuthorizer) Authorize(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), JwtPayloadKey{}, string(t))
+		ctx := context.WithValue(r.Context(), JwtClaimsKey{}, string(t))
 		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)

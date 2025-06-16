@@ -23,6 +23,8 @@ type Session struct {
 	Connection WebsocketConn
 	// Session logger
 	Logger slog.Logger
+	// JwtClaims contains the JWT payload from the client
+	JwtClaims *string
 }
 
 // NewSession creates a new WebSocket session with the provided parameters
@@ -82,6 +84,7 @@ func (s *Session) Receive() {
 		Event:        backend.ClientConnected,
 		Payload:      make([]byte, 0),
 		QueryString:  s.QueryString,
+		JwtClaims:    s.JwtClaims,
 	}
 
 	err := s.Backend.Send(msg, s)
@@ -143,6 +146,8 @@ type SessionParams struct {
 	Connection WebsocketConn
 	// Session logger
 	Logger slog.Logger
+	// JwtClaims contains the JWT payload from the client
+	JwtClaims *string
 }
 
 type ConnectionSignal int

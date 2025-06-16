@@ -25,6 +25,9 @@ const EventHeader = "Ws-Event"
 // QueryStringHeader contains the query string from the client
 const QueryStringHeader = "Ws-Query-String"
 
+// JwtClaimsHeader contains the JWT claims from the client
+const JwtClaimsHeader = "Ws-Session-Jwt-Claims"
+
 // CommandHeader specifies the command to execute on the WebSocket connection
 const CommandHeader = "Ws-Command"
 
@@ -118,6 +121,8 @@ type BackendMessage struct {
 	Payload []byte
 	// QueryString contains the query string from the client
 	QueryString string
+	// JwtClaims contains the JWT claims from the client
+	JwtClaims *string
 }
 
 type httpClient interface {
@@ -144,6 +149,10 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 
 	if len(msg.QueryString) > 0 {
 		h[QueryStringHeader] = []string{msg.QueryString}
+	}
+
+	if msg.JwtClaims != nil {
+		h[JwtClaimsHeader] = []string{*msg.JwtClaims}
 	}
 
 	req.Header = h
