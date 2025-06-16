@@ -22,15 +22,8 @@ const (
 	TestTimeout = time.Second * 1
 )
 
-// TestWebsocketToWebhook tests the full flow of WebSocket to webhook communication:
-// 1. Client connects via WebSocket
-// 2. Client sends a message that gets forwarded to webhook
-// 3. Backend sends a message back via reply URL
-// 4. Client sends a message and gets immediate response from backend
-// 5. Client disconnects and backend is notified
-// 6. New client connects and backend terminates the session
+// TestWebsocketToWebhook tests the full flow of WebSocket to webhook communication
 func TestWebsocketToWebhook(t *testing.T) {
-
 	logger.InitLogger(&server.Config{
 		LogLevel: slog.LevelDebug,
 	})
@@ -46,15 +39,19 @@ func TestWebsocketToWebhook(t *testing.T) {
 	// make sure ws server is up
 	time.Sleep(time.Millisecond * 10)
 
-	expectedQueryString := "test=" + uuid.NewString()
-	conn, sessionId, replyUrl := clientConnected(wh, t, expectedQueryString)
-	websocketClientMessageSent(conn, wh, sessionId, expectedQueryString, t)
-	backendMessageSent(conn, replyUrl, t)
-	websocketClientMessageWithImmediateBackendResponse(conn, wh, sessionId, t)
-	websocketClientDisconnected(conn, wh, sessionId, t)
+	t.Run("Client Connection and Message Flow", func(t *testing.T) {
+		expectedQueryString := "test=" + uuid.NewString()
+		conn, sessionId, replyUrl := clientConnected(wh, t, expectedQueryString)
+		websocketClientMessageSent(conn, wh, sessionId, expectedQueryString, t)
+		backendMessageSent(conn, replyUrl, t)
+		websocketClientMessageWithImmediateBackendResponse(conn, wh, sessionId, t)
+		websocketClientDisconnected(conn, wh, sessionId, t)
+	})
 
-	conn, _, replyUrl = clientConnected(wh, t, "")
-	sessionTerminatedByBackend(conn, replyUrl, t)
+	t.Run("Session Termination by Backend", func(t *testing.T) {
+		conn, _, replyUrl := clientConnected(wh, t, "")
+		sessionTerminatedByBackend(conn, replyUrl, t)
+	})
 }
 
 // clientConnected establishes a WebSocket connection and verifies the backend
