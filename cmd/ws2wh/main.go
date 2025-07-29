@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/ws2wh/ws2wh/cmd/logger"
 	"github.com/ws2wh/ws2wh/cmd/ws2wh/flags"
@@ -23,8 +25,13 @@ func main() {
 
 	sigs := make(chan os.Signal, 1)
 
-	signal.Notify(sigs, os.Interrupt, os.Kill)
+	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
 	<-sigs
 
 	cancel()
+
+	// grace period for servers
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+	<-shutdownCtx.Done()
 }

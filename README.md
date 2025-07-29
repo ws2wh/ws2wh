@@ -22,9 +22,8 @@ Parameters can be provided either as command-line flags or environment variables
 | `-metrics-port` | `METRICS_PORT` | `9090` | Prometheus metrics port |
 | `-metrics-path` | `METRICS_PATH` | `/metrics` | Prometheus metrics path |
 | `-tls-enabled` | `TLS_ENABLED` | `false` | Enables TLS |
-| `-tls-cert-path` | `TLS_CERT_PATH` | (optional) | TLS certificate path (PEM format). Required if TLS key path set. |
-| `-tls-key-path` | `TLS_KEY_PATH` | (optional) | TLS key path (PEM format). Required if TLS certificate path set. |
-| `-jwt-enabled` | `JWT_ENABLED` | `false` | Enables JWT authentication |
+| `-tls-cert-path` | `TLS_CERT_PATH` | (optional) | TLS certificate path (PEM format). Required if TLS key path is set. |
+| `-tls-key-path` | `TLS_KEY_PATH` | (optional) | TLS key path (PEM format). Required if TLS certificate path is set. || `-jwt-enabled` | `JWT_ENABLED` | `false` | Enables JWT authentication |
 | `-jwt-secret-type` | `JWT_SECRET_TYPE` | `jwks-url` | JWT secret type (jwks-file, jwks-url, openid) |
 | `-jwt-secret-path` | `JWT_SECRET_PATH` | (required if JWT enabled) | Path to JWT secret (file path or URL depending on secret type) |
 | `-jwt-query-param` | `JWT_QUERY_PARAM` | `token` | Query parameter name for JWT token |

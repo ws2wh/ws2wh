@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -65,7 +66,13 @@ func (a *JwtAuthorizer) Authorize(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), JwtClaimsKey{}, string(t))
+		claims := make(map[string]interface{})
+		if err := json.Unmarshal(t, &claims); err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), JwtClaimsKey{}, claims)
 		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)

@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"log/slog"
+	"net/url"
 
 	"github.com/ws2wh/ws2wh/http-middleware/jwt"
 	"github.com/ws2wh/ws2wh/metrics"
@@ -52,5 +53,9 @@ type ReplyChannelConfig struct {
 }
 
 func (c *ReplyChannelConfig) GetReplyUrl() string {
-	return fmt.Sprintf("%s://%s:%s%s", c.Scheme, c.Hostname, c.Port, c.PathPrefix)
+	u := fmt.Sprintf("%s://%s:%s%s", c.Scheme, c.Hostname, c.Port, c.PathPrefix)
+	if _, err := url.Parse(u); err != nil {
+		slog.Warn("Invalid reply URL generated", "url", u, "error", err)
+	}
+	return u
 }
