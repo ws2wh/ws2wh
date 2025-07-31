@@ -27,6 +27,8 @@ func NewJwtAuthorizer(config *JwtConfig) (*JwtAuthorizer, error) {
 	}
 	return &JwtAuthorizer{
 		queryParam: config.QueryParam,
+		issuer:     config.Issuer,
+		audience:   config.Audience,
 		keys:       keys,
 	}, nil
 }
