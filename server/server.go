@@ -134,7 +134,14 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	var body []byte
-	body, _ = io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		slog.Error("Error reading request body", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(SessionResponse{Success: false, Message: "INVALID_REQUEST"})
+		return
+	}
+
 	session := s.sessions[id]
 
 	if session == nil {
@@ -162,7 +169,7 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	err := json.NewEncoder(w).Encode(SessionResponse{Success: true})
+	err = json.NewEncoder(w).Encode(SessionResponse{Success: true})
 	if err != nil {
 		slog.Error("Error while sending response", "error", err)
 	}
