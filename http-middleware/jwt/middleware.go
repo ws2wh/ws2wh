@@ -74,6 +74,46 @@ func (a *JwtAuthorizer) Authorize(next http.Handler) http.Handler {
 			return
 		}
 
+		// Validate issuer if configured
+		if a.issuer != "" {
+			if iss, ok := claims["iss"].(string); !ok || iss != a.issuer {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+		}
+
+		// Validate audience if configured
+		if a.audience != "" {
+			if aud, ok := claims["aud"]; ok {
+				// Handle both string and []string audience formats
+				switch v := aud.(type) {
+				case string:
+					if v != a.audience {
+						http.Error(w, "Unauthorized", http.StatusUnauthorized)
+						return
+					}
+				case []interface{}:
+					found := false
+					for _, aud := range v {
+						if str, ok := aud.(string); ok && str == a.audience {
+							found = true
+							break
+						}
+					}
+					if !found {
+						http.Error(w, "Unauthorized", http.StatusUnauthorized)
+						return
+					}
+				default:
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
+			} else {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+		}
+
 		ctx := context.WithValue(r.Context(), JwtClaimsKey{}, claims)
 		r = r.WithContext(ctx)
 
