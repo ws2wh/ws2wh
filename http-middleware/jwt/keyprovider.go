@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -85,7 +86,12 @@ type OpenIDConfigProvider struct {
 }
 
 func (p *OpenIDConfigProvider) GetKeys() (*jose.JSONWebKeySet, error) {
-	resp, err := httpClient.Get(p.Issuer + "/.well-known/openid-configuration")
+	issuerURL, err := url.Parse(p.Issuer)
+	if err != nil {
+		return nil, fmt.Errorf("invalid issuer URL: %w", err)
+	}
+	configURL := issuerURL.ResolveReference(&url.URL{Path: "/.well-known/openid-configuration"})
+	resp, err := httpClient.Get(configURL.String())
 	if err != nil {
 		return nil, err
 	}
