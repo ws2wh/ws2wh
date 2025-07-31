@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -27,6 +28,7 @@ type Server struct {
 	backendUrl     string
 	replyUrl       string
 	sessions       map[string]*session.Session
+	sessionsLock   sync.RWMutex
 	httpHandler    http.Handler
 	tlsCertPath    string
 	tlsKeyPath     string
@@ -109,22 +111,39 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		jwtClaims = &claims
 	}
 
-	s.sessions[id] = session.NewSession(session.SessionParams{
-		Id:           id,
-		Backend:      s.DefaultBackend,
-		ReplyChannel: fmt.Sprintf("%s/%s", s.replyUrl, id),
-		QueryString:  r.URL.RawQuery,
-		Connection:   handler,
-		Logger:       *slog.Default().With("sessionId", id),
-		JwtClaims:    jwtClaims,
-	})
+	func() {
+		s.sessionsLock.Lock()
+		defer s.sessionsLock.Unlock()
 
-	m.ActiveSessionsGauge.Inc()
+		s.sessions[id] = session.NewSession(session.SessionParams{
+			Id:           id,
+			Backend:      s.DefaultBackend,
+			ReplyChannel: fmt.Sprintf("%s/%s", s.replyUrl, id),
+			QueryString:  r.URL.RawQuery,
+			Connection:   handler,
+			Logger:       *slog.Default().With("sessionId", id),
+			JwtClaims:    jwtClaims,
+		})
 
-	defer m.ActiveSessionsGauge.Dec()
-	defer delete(s.sessions, id)
+		m.ActiveSessionsGauge.Inc()
+	}()
 
-	go s.sessions[id].Receive()
+	defer func() {
+		s.sessionsLock.Lock()
+		defer s.sessionsLock.Unlock()
+		delete(s.sessions, id)
+		m.ActiveSessionsGauge.Dec()
+	}()
+
+	go func() {
+		s := s.sessions[id]
+		if s != nil {
+			s.Receive()
+		} else {
+			slog.Warn("Session ended before starting to receive", "sessionId", id)
+		}
+	}()
+
 	err := handler.Handle(w, r, w.Header())
 	if err != nil {
 		slog.Error("Error while handling WebSocket connection", "error", err)
