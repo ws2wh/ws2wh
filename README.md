@@ -5,30 +5,31 @@ WS2WH is a lightweight bridge that connects WebSocket clients to HTTP webhook en
 ## Usage
 
 ```
-ws2wh -b https://example.com/api/v1/webhook -r /reply -l :3000 -p / -v INFO -h localhost -t
+ws2wh -b https://example.com/api/v1/webhook -r /reply -l :3000 -p / -v INFO -h localhost
 ```
 
 Parameters can be provided either as command-line flags or environment variables:
 
-| Flag | Environment Variable | Default | Description |
-|-|-|-|-|
-| `-b` | `BACKEND_URL` | (required) | Webhook backend URL that will receive POST requests from the relay |
-| `-r` | `REPLY_PATH_PREFIX` | `/reply` | Path prefix for backend replies |
-| `-l` | `WS_PORT` | `:3000` | Address and port for the WebSocket server to listen on |
-| `-p` | `WS_PATH` | `/` | Path where WebSocket connections will be upgraded |
-| `-v` | `LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARN, ERROR, OFF) |
-| `-h` | `REPLY_HOSTNAME` or `HOSTNAME` | `localhost` | Hostname to use in reply channel |
-| `-metrics-enabled` | `METRICS_ENABLED` | `false` | Enables Prometheus metrics endpoint |
-| `-metrics-port` | `METRICS_PORT` | `9090` | Prometheus metrics port |
-| `-metrics-path` | `METRICS_PATH` | `/metrics` | Prometheus metrics path |
-| `-tls-enabled` | `TLS_ENABLED` | `false` | Enables TLS |
-| `-tls-cert-path` | `TLS_CERT_PATH` | (optional) | TLS certificate path (PEM format). Required if TLS key path is set. |
-| `-tls-key-path` | `TLS_KEY_PATH` | (optional) | TLS key path (PEM format). Required if TLS certificate path is set. || `-jwt-enabled` | `JWT_ENABLED` | `false` | Enables JWT authentication |
-| `-jwt-secret-type` | `JWT_SECRET_TYPE` | `jwks-url` | JWT secret type (jwks-file, jwks-url, openid) |
-| `-jwt-secret-path` | `JWT_SECRET_PATH` | (required if JWT enabled) | Path to JWT secret (file path or URL depending on secret type) |
-| `-jwt-query-param` | `JWT_QUERY_PARAM` | `token` | Query parameter name for JWT token |
-| `-jwt-issuer` | `JWT_ISSUER` | (optional) | JWT issuer |
-| `-jwt-audience` | `JWT_AUDIENCE` | (optional) | JWT audience |
+| Flag               | Environment Variable           | Default                   | Description                                                         |
+|--------------------|--------------------------------|---------------------------|---------------------------------------------------------------------|
+| `-b`               | `BACKEND_URL`                  | (required)                | Webhook backend URL that will receive POST requests from the relay  |
+| `-r`               | `REPLY_PATH_PREFIX`            | `/reply`                  | Path prefix for backend replies                                     |
+| `-l`               | `WS_PORT`                      | `:3000`                   | Address and port for the WebSocket server to listen on              |
+| `-p`               | `WS_PATH`                      | `/`                       | Path where WebSocket connections will be upgraded                   |
+| `-v`               | `LOG_LEVEL`                    | `INFO`                    | Log level (DEBUG, INFO, WARN, ERROR, OFF)                           |
+| `-h`               | `REPLY_HOSTNAME` or `HOSTNAME` | `localhost`               | Hostname to use in reply channel                                    |
+| `-metrics-enabled` | `METRICS_ENABLED`              | `false`                   | Enables Prometheus metrics endpoint                                 |
+| `-metrics-port`    | `METRICS_PORT`                 | `9090`                    | Prometheus metrics port                                             |
+| `-metrics-path`    | `METRICS_PATH`                 | `/metrics`                | Prometheus metrics path                                             |
+| `-tls-enabled`     | `TLS_ENABLED`                  | `false`                   | Enables TLS                                                         |
+| `-tls-cert-path`   | `TLS_CERT_PATH`                | (optional)                | TLS certificate path (PEM format). Required if TLS key path is set. |
+| `-tls-key-path`    | `TLS_KEY_PATH`                 | (optional)                | TLS key path (PEM format). Required if TLS certificate path is set. |
+| `-jwt-enabled`     | `JWT_ENABLED`                  | `false`                   | Enables JWT authentication                                          |
+| `-jwt-secret-type` | `JWT_SECRET_TYPE`              | `jwks-url`                | JWT secret type (jwks-file, jwks-url, openid)                       |
+| `-jwt-secret-path` | `JWT_SECRET_PATH`              | (required if JWT enabled) | Path to JWT secret (file path or URL depending on secret type)      |
+| `-jwt-query-param` | `JWT_QUERY_PARAM`              | `token`                   | Query parameter name for JWT token                                  |
+| `-jwt-issuer`      | `JWT_ISSUER`                   | (optional)                | JWT issuer                                                          |
+| `-jwt-audience`    | `JWT_AUDIENCE`                 | (optional)                | JWT audience                                                        |
 
 Example using environment variables:
 
