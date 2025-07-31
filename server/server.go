@@ -107,8 +107,13 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	handler := frontend.NewWsHandler(*slog.Default().With("sessionId", id), id)
 
 	var jwtClaims *string
-	if claims, ok := r.Context().Value(jwt.JwtClaimsKey{}).(string); ok {
-		jwtClaims = &claims
+	if claims, ok := r.Context().Value(jwt.JwtClaimsKey{}).(map[string]interface{}); ok {
+		if claimsJSON, err := json.Marshal(claims); err == nil {
+			claimsStr := string(claimsJSON)
+			jwtClaims = &claimsStr
+		} else {
+			slog.Error("Failed to marshal JWT claims", "error", err)
+		}
 	}
 
 	s.addSession(id, session.NewSession(session.SessionParams{
