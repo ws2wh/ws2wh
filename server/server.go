@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -96,8 +97,10 @@ func (s *Server) Start(ctx context.Context) {
 
 	go func() {
 		<-ctx.Done()
-		if err := server.Shutdown(context.Background()); err != nil {
-			slog.Error("Error during gracefully server shutdown", "err", err)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			slog.Warn("Error during gracefully server shutdown", "err", err)
 		}
 	}()
 }
