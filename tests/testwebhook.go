@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -37,7 +38,11 @@ func CreateTestWebhook() *TestWebhook {
 }
 
 func (b *TestWebhook) handler(w http.ResponseWriter, r *http.Request) {
-	p, _ := io.ReadAll(r.Body)
+	p, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	msg := backend.BackendMessage{
 		SessionId:    r.Header.Get(backend.SessionIdHeader),
 		ReplyChannel: r.Header.Get(backend.ReplyChannelHeader),
@@ -52,15 +57,17 @@ func (b *TestWebhook) handler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		resp := b.responses[0]
 		b.responses = b.responses[1:]
-		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
 		w.Write(resp)
 	}
 }
 
 func (b *TestWebhook) Start() {
 	go func() {
-		b.server.ListenAndServe()
+		if err := b.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			panic(fmt.Sprintf("Test webhook server error: %v", err))
+		}
 	}()
 }
 
