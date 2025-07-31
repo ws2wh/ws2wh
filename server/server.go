@@ -111,34 +111,21 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		jwtClaims = &claims
 	}
 
-	func() {
-		s.sessionsLock.Lock()
-		defer s.sessionsLock.Unlock()
-
-		s.sessions[id] = session.NewSession(session.SessionParams{
-			Id:           id,
-			Backend:      s.DefaultBackend,
-			ReplyChannel: fmt.Sprintf("%s/%s", s.replyUrl, id),
-			QueryString:  r.URL.RawQuery,
-			Connection:   handler,
-			Logger:       *slog.Default().With("sessionId", id),
-			JwtClaims:    jwtClaims,
-		})
-
-		m.ActiveSessionsGauge.Inc()
-	}()
-
-	defer func() {
-		s.sessionsLock.Lock()
-		defer s.sessionsLock.Unlock()
-		delete(s.sessions, id)
-		m.ActiveSessionsGauge.Dec()
-	}()
+	s.addSession(id, session.NewSession(session.SessionParams{
+		Id:           id,
+		Backend:      s.DefaultBackend,
+		ReplyChannel: fmt.Sprintf("%s/%s", s.replyUrl, id),
+		QueryString:  r.URL.RawQuery,
+		Connection:   handler,
+		Logger:       *slog.Default().With("sessionId", id),
+		JwtClaims:    jwtClaims,
+	}))
+	defer s.deleteSession(id)
 
 	go func() {
-		s := s.sessions[id]
-		if s != nil {
-			s.Receive()
+		session := s.getSession(id)
+		if session != nil {
+			session.Receive()
 		} else {
 			slog.Warn("Session ended before starting to receive", "sessionId", id)
 		}
@@ -148,6 +135,26 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("Error while handling WebSocket connection", "error", err)
 	}
+}
+
+func (s *Server) getSession(id string) *session.Session {
+	s.sessionsLock.RLock()
+	defer s.sessionsLock.RUnlock()
+	return s.sessions[id]
+}
+
+func (s *Server) deleteSession(id string) {
+	s.sessionsLock.Lock()
+	defer s.sessionsLock.Unlock()
+	delete(s.sessions, id)
+	m.ActiveSessionsGauge.Dec()
+}
+
+func (s *Server) addSession(id string, session *session.Session) {
+	s.sessionsLock.Lock()
+	defer s.sessionsLock.Unlock()
+	s.sessions[id] = session
+	m.ActiveSessionsGauge.Inc()
 }
 
 func (s *Server) send(w http.ResponseWriter, r *http.Request) {
@@ -161,8 +168,7 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session := s.sessions[id]
-
+	session := s.getSession(id)
 	if session == nil {
 		w.WriteHeader(http.StatusNotFound)
 		err := json.NewEncoder(w).Encode(SessionResponse{Success: false, Message: "NOT_FOUND"})
