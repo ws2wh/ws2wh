@@ -69,7 +69,15 @@ func LoadConfig() *server.Config {
 			PathPrefix: *replyPathPrefix,
 			Hostname:   *hostname,
 			Scheme:     replyScheme,
-			Port:       strings.Replace(*websocketListener, ":", "", 1),
+			Port: func() string {
+				if strings.HasPrefix(*websocketListener, ":") {
+					return (*websocketListener)[1:]
+				}
+				if lastColon := strings.LastIndex(*websocketListener, ":"); lastColon != -1 {
+					return (*websocketListener)[lastColon+1:]
+				}
+				return "3000" // fallback
+			}(),
 		},
 		WebSocketListener: *websocketListener,
 		WebSocketPath:     *websocketPath,
@@ -135,8 +143,8 @@ func createSecretProvider(secretType, secretPath string) jwt.KeyProvider {
 			Issuer: secretPath,
 		}
 	default:
-		// TODO: should we fail here?
-		slog.Warn("Unknown JWT secret type, using no secret", "type", secretType)
+		slog.Error("Unknown JWT secret type", "type", secretType)
+		os.Exit(1)
 		return nil
 	}
 }
