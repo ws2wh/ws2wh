@@ -6,9 +6,14 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-jose/go-jose/v4"
 )
+
+var httpClient = &http.Client{
+	Timeout: 30 * time.Second,
+}
 
 // KeyProvider defines an interface for different ways to provide JWT secret
 type KeyProvider interface {
@@ -56,7 +61,7 @@ func (p *JWKSURLProvider) GetKeys() (*jose.JSONWebKeySet, error) {
 }
 
 func (p *JWKSURLProvider) fetchJWKS() (*jose.JSONWebKeySet, error) {
-	resp, err := http.Get(p.URL)
+	resp, err := httpClient.Get(p.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +85,7 @@ type OpenIDConfigProvider struct {
 }
 
 func (p *OpenIDConfigProvider) GetKeys() (*jose.JSONWebKeySet, error) {
-	resp, err := http.Get(p.Issuer + "/.well-known/openid-configuration")
+	resp, err := httpClient.Get(p.Issuer + "/.well-known/openid-configuration")
 	if err != nil {
 		return nil, err
 	}
