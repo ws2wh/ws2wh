@@ -58,18 +58,21 @@ func (a *JwtAuthorizer) Authorize(next http.Handler) http.Handler {
 		})
 
 		if err != nil {
+			slog.Debug("Failed to parse signed token", "error", err)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		t, err := signature.Verify(a.keys)
 		if err != nil {
+			slog.Debug("Failed to verify signed token", "error", err)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		claims := make(map[string]interface{})
 		if err := json.Unmarshal(t, &claims); err != nil {
+			slog.Debug("Failed to unmarshal claims", "error", err)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -77,6 +80,7 @@ func (a *JwtAuthorizer) Authorize(next http.Handler) http.Handler {
 		// Validate issuer if configured
 		if a.issuer != "" {
 			if iss, ok := claims["iss"].(string); !ok || iss != a.issuer {
+				slog.Error("Invalid issuer", "issuer", iss, "expected", a.issuer)
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -89,6 +93,7 @@ func (a *JwtAuthorizer) Authorize(next http.Handler) http.Handler {
 				switch v := aud.(type) {
 				case string:
 					if v != a.audience {
+						slog.Debug("Invalid audience", "audience", v, "expected", a.audience)
 						http.Error(w, "Unauthorized", http.StatusUnauthorized)
 						return
 					}
@@ -101,14 +106,17 @@ func (a *JwtAuthorizer) Authorize(next http.Handler) http.Handler {
 						}
 					}
 					if !found {
+						slog.Debug("Invalid audience", "audience", v, "expected", a.audience)
 						http.Error(w, "Unauthorized", http.StatusUnauthorized)
 						return
 					}
 				default:
+					slog.Debug("Invalid audience", "audience", v, "expected", a.audience)
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
 				}
 			} else {
+				slog.Debug("Missing audience", "audience", a.audience)
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}

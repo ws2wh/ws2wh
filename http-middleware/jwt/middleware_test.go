@@ -18,7 +18,8 @@ var (
 )
 
 func TestJwtAuthorizer(t *testing.T) {
-	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	assert.NoError(t, err)
 	jwks := &jose.JSONWebKeySet{
 		Keys: []jose.JSONWebKey{
 			{
@@ -346,7 +347,8 @@ func TestJwtAuthorizer(t *testing.T) {
 
 func TestJwtAuthorizerWithDifferentAlgorithms(t *testing.T) {
 	hmacKey := make([]byte, 32)
-	rand.Read(hmacKey)
+	_, err := rand.Read(hmacKey)
+	assert.NoError(t, err)
 	jwks := &jose.JSONWebKeySet{
 		Keys: []jose.JSONWebKey{
 			{
