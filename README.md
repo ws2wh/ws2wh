@@ -181,3 +181,16 @@ Content-Length: 10
 
 Goodbye!
 ```
+
+In the example above, the backend server would send a `Ws-Command: terminate-session` header to a session reply channel. The websocket session, along with the connection, will get closed gracefully with code 1000 by default.
+Close details can be customized by providing `Ws-Close-Code` and `Ws-Close-Reason` headers.
+
+```http
+POST /reply/550e8400-e29b-41d4-a716-446655440000 HTTP/1.1
+Host: ws2wh-host:3000
+Ws-Command: terminate-session
+Ws-Close-Code: 1000
+Ws-Close-Reason: "Closing connection"
+```
+
+`Ws-Close-Code` value can be any integer value, although it is recommended to use one of the [standard close codes](https://www.rfc-editor.org/rfc/rfc6455#section-7.4). `Ws-Close-Reason` is a string value that will be sent to the WebSocket client.

@@ -38,7 +38,7 @@ func (m *MockWebsocketConn) Signal() <-chan ConnectionSignal {
 	return m.doneChan
 }
 
-func (m *MockWebsocketConn) Close() error {
+func (m *MockWebsocketConn) Close(closeCode int, closeReason *string) error {
 	m.closeCalled = true
 	return m.closeError
 }
@@ -85,7 +85,7 @@ func TestSession_Close(t *testing.T) {
 	conn := NewMockWebsocketConn()
 	session := &Session{Connection: conn, Logger: *slog.Default()}
 
-	err := session.Close()
+	err := session.Close(1000, nil)
 
 	assert.NoError(t, err, "Close should not return error")
 	assert.True(t, conn.closeCalled, "Close should be called on WebsocketConn")

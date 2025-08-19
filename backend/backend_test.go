@@ -173,7 +173,7 @@ func (s *testSessionHandle) Send(payload []byte) error {
 	s.sendCount += 1
 	return nil
 }
-func (s *testSessionHandle) Close() error {
+func (s *testSessionHandle) Close(closeCode int, closeReason *string) error {
 	s.closeCount += 1
 	return nil
 }

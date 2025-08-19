@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
 	metrics "github.com/ws2wh/ws2wh/metrics/directory"
@@ -30,6 +31,14 @@ const JwtClaimsHeader = "Ws-Session-Jwt-Claims"
 
 // CommandHeader specifies the command to execute on the WebSocket connection
 const CommandHeader = "Ws-Command"
+
+// CloseCodeHeader contains the close code to use when closing the WebSocket connection
+// Default is 1000
+const CloseCodeHeader = "Ws-Close-Code"
+
+// CloseReasonHeader contains the reason for closing the WebSocket connection
+// Defaults to empty value
+const CloseReasonHeader = "Ws-Close-Reason"
 
 // SendMessageCommand instructs the server to send a message to the WebSocket client
 const SendMessageCommand = "send-message"
@@ -206,13 +215,35 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 	}
 
 	if res.Header.Get(CommandHeader) == TerminateSessionCommand {
-		err = session.Close()
+		closeCode, err := getCloseCode(res, msg)
+		if err != nil {
+			slog.Error("Error while getting close code", "error", err, "sessionId", msg.SessionId)
+			return err
+		}
+		closeReason := res.Header.Get(CloseReasonHeader)
+		err = session.Close(int(closeCode), &closeReason)
 		if err != nil {
 			slog.Error("Error while closing session", "error", err, "sessionId", msg.SessionId)
 			return err
 		}
 	}
+
 	return nil
+}
+
+func getCloseCode(res *http.Response, msg BackendMessage) (int, error) {
+	headerVal := res.Header.Get(CloseCodeHeader)
+	if headerVal == "" {
+		return 1000, nil
+	}
+
+	closeCode, err := strconv.ParseInt(headerVal, 10, 32)
+	if err != nil {
+		slog.Error("Error while parsing close code", "error", err, "sessionId", msg.SessionId)
+		return 0, err
+	}
+
+	return int(closeCode), nil
 }
 
 // SessionHandle provides an interface for interacting with a WebSocket session
@@ -223,6 +254,8 @@ type SessionHandle interface {
 	Send(message []byte) error
 
 	// Close terminates the WebSocket session
+	// closeCode is the close code to use when closing the WebSocket connection
+	// closeReason is the reason for closing the WebSocket connection
 	// Returns an error if the close fails
-	Close() error
+	Close(closeCode int, closeReason *string) error
 }

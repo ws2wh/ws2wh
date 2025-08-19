@@ -142,24 +142,33 @@ func websocketClientDisconnected(conn *websocket.Conn, wh *TestWebhook, sessionI
 func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testing.T) {
 	assert := assert.New(t)
 
-	expectedGoodbyeMessage := []byte(uuid.NewString())
-
-	req, _ := http.NewRequest(http.MethodPost, replyUrl, bytes.NewReader([]byte(expectedGoodbyeMessage)))
+	expectedDataPayload := []byte(uuid.NewString())
+	expectedCloseReason := "test reason"
+	req, _ := http.NewRequest(http.MethodPost, replyUrl, bytes.NewReader([]byte(expectedDataPayload)))
 
 	req.Header = http.Header{
-		backend.CommandHeader: {backend.TerminateSessionCommand},
+		backend.CommandHeader:     {backend.TerminateSessionCommand},
+		backend.CloseCodeHeader:   {"1001"},
+		backend.CloseReasonHeader: {expectedCloseReason},
 	}
 
-	messageType := make(chan int, 1)
-	messageData := make(chan []byte, 1)
+	messageType := make(chan int)
+	messageData := make(chan []byte)
 	var closed bool
 
 	go func() {
 		for {
 			mt, d, err := conn.ReadMessage()
 			if err != nil {
+				if e, ok := err.(*websocket.CloseError); ok {
+					closed = true
+					messageType <- e.Code
+					messageData <- []byte(e.Text)
+					break
+				}
 				break
 			}
+
 			messageType <- mt
 			messageData <- d
 		}
@@ -172,9 +181,13 @@ func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testin
 	assert.Equal(http.StatusOK, r.StatusCode, "backend should receive 200 on sending to reply url")
 
 	mt := <-messageType
-	actualGoodbyeMessage := <-messageData
 	assert.Equal(websocket.TextMessage, mt)
-	assert.Equal(expectedGoodbyeMessage, actualGoodbyeMessage)
+	actualBackendMsg := <-messageData
+	assert.Equal(expectedDataPayload, actualBackendMsg)
+
+	mt = <-messageType
+	actualCloseReason := <-messageData
+	assert.Equal(expectedCloseReason, string(actualCloseReason))
 	assert.True(closed)
 }
 

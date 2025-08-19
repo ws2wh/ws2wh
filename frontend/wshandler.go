@@ -70,12 +70,13 @@ func (h *WebsocketHandler) Signal() <-chan session.ConnectionSignal {
 }
 
 // Close gracefully terminates the WebSocket connection
-func (h *WebsocketHandler) Close() error {
+func (h *WebsocketHandler) Close(closeCode int, closeReason *string) error {
 	h.signalChannel <- session.ConnectionClosedSignal
 
 	h.closed = true
 
-	err := h.conn.WriteMessage(websocket.CloseMessage, make([]byte, 0))
+	closeMessage := websocket.FormatCloseMessage(closeCode, *closeReason)
+	err := h.conn.WriteMessage(websocket.CloseMessage, closeMessage)
 	if err != nil {
 		return err
 	}
