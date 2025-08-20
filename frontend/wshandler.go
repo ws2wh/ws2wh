@@ -81,13 +81,18 @@ func (h *WebsocketHandler) Close(closeCode int, closeReason *string) error {
 	defer func() {
 		err := h.conn.Close()
 		if err != nil {
-			slog.Error("Error while closing connection", "error", err)
+			h.logger.Error("Error while closing connection", "error", err)
 		}
 	}()
 
 	h.signalChannel <- session.ConnectionClosedSignal
 
-	closeMessage := websocket.FormatCloseMessage(closeCode, *closeReason)
+	var reason string
+	if closeReason != nil {
+		reason = *closeReason
+	}
+
+	closeMessage := websocket.FormatCloseMessage(closeCode, reason)
 	err := h.conn.WriteMessage(websocket.CloseMessage, closeMessage)
 	if err != nil {
 		return err

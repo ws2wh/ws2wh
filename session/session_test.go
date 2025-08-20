@@ -23,7 +23,7 @@ type MockWebsocketConn struct {
 func NewMockWebsocketConn() *MockWebsocketConn {
 	return &MockWebsocketConn{
 		receiverChan: make(chan []byte, 64),
-		doneChan:     make(chan ConnectionSignal, 64),
+		doneChan:     make(chan ConnectionSignal),
 	}
 }
 
@@ -113,15 +113,13 @@ func TestSession_Receive(t *testing.T) {
 
 	// Test connection message
 	go func() {
+		defer close(conn.doneChan)
 		// Simulate ready signal
 		conn.doneChan <- ConnectionReadySignal
 		// Simulate message received
 		conn.receiverChan <- []byte("test message")
 		// Simulate closed signal
 		conn.doneChan <- ConnectionClosedSignal
-
-		// Then simulate connection close
-		close(conn.doneChan)
 	}()
 
 	session.Receive()
