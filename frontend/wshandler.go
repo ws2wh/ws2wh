@@ -6,6 +6,7 @@ package frontend
 import (
 	"log/slog"
 	"net/http"
+	"sync/atomic"
 
 	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus"
@@ -38,7 +39,7 @@ type WebsocketHandler struct {
 	conn            *websocket.Conn
 	logger          slog.Logger
 	sessionId       string
-	closed          bool
+	closed          atomic.Bool
 }
 
 // Send writes a message to the WebSocket connection
@@ -71,14 +72,18 @@ func (h *WebsocketHandler) Signal() <-chan session.ConnectionSignal {
 
 // Close gracefully terminates the WebSocket connection
 func (h *WebsocketHandler) Close(closeCode int, closeReason *string) error {
+	if h.closed.Load() {
+		return nil
+	}
+
+	h.closed.Store(true)
+
 	defer func() {
 		err := h.conn.Close()
 		if err != nil {
 			slog.Error("Error while closing connection", "error", err)
 		}
 	}()
-
-	h.closed = true
 
 	h.signalChannel <- session.ConnectionClosedSignal
 
@@ -130,7 +135,7 @@ func (h *WebsocketHandler) handleReadMessageErr(err error) error {
 
 	defer func() { h.signalChannel <- session.ConnectionClosedSignal }()
 
-	if h.closed {
+	if h.closed.Load() {
 		m.DisconnectCounter.With(prometheus.Labels{
 			m.OriginLabel: m.OriginValueBackend,
 		}).Inc()

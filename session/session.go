@@ -52,7 +52,11 @@ func (s *Session) Send(message []byte) error {
 // Close terminates the WebSocket connection for this session
 // Returns an error if closing the connection fails
 func (s *Session) Close(closeCode int, closeReason *string) error {
-	s.Logger.Debug("Closing WebSocket connection", "sessionId", s.Id)
+	s.Logger.Debug("Closing WebSocket connection",
+		"sessionId", s.Id,
+		"closeCode", closeCode,
+		"closeReason", closeReason,
+	)
 	return s.Connection.Close(closeCode, closeReason)
 }
 
