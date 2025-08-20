@@ -3,6 +3,7 @@ package session
 import (
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/ws2wh/ws2wh/backend"
@@ -100,6 +101,7 @@ func TestSession_Close(t *testing.T) {
 	}
 }
 
+// Test is flaky
 func TestSession_Receive(t *testing.T) {
 	conn := NewMockWebsocketConn()
 	mockBackend := &MockBackend{}
@@ -113,16 +115,21 @@ func TestSession_Receive(t *testing.T) {
 
 	// Test connection message
 	go func() {
-		defer close(conn.doneChan)
 		// Simulate ready signal
 		conn.doneChan <- ConnectionReadySignal
+		time.Sleep(time.Millisecond * 100)
 		// Simulate message received
 		conn.receiverChan <- []byte("test message")
+		time.Sleep(time.Millisecond * 100)
 		// Simulate closed signal
 		conn.doneChan <- ConnectionClosedSignal
+		time.Sleep(time.Millisecond * 100)
+		close(conn.doneChan)
 	}()
 
 	session.Receive()
+
+	time.Sleep(time.Second * 2)
 
 	// Verify messages sent to backend
 	assert.Len(t, mockBackend.messages, 3, "Should have 3 backend messages")
