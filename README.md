@@ -7,7 +7,9 @@ want to add WebSocket support to existing HTTP APIs without modifying the backen
 handles the protocol translation and message routing, making it an ideal solution for scenarios requiring real-time
 updates in HTTP-based architectures.
 
-## Usage```shell
+## Usage
+
+```shell
 ws2wh -b https://example.com/api/v1/webhook -r /reply -l :3000 -p / -v INFO -h localhost
 ```
 
