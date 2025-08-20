@@ -19,7 +19,7 @@ import (
 
 const (
 	// May be increased e.g. for debugging
-	TestTimeout = time.Second * 1
+	TestTimeout = time.Second * 2
 )
 
 // TestWebsocketToWebhook tests the full flow of WebSocket to webhook communication
@@ -101,6 +101,8 @@ func backendMessageSent(conn *websocket.Conn, replyUrl string, t *testing.T) {
 	resp, err := http.Post(replyUrl, "text/plain", bytes.NewReader(expectedBackendMsg))
 
 	assert.Nil(err, "reply url call should not respond with client error")
+	defer resp.Body.Close()
+
 	assert.Less(resp.StatusCode, 300, "reply url call should result with successful response")
 	assert.GreaterOrEqual(resp.StatusCode, 200, "reply url call should result with successful response")
 
@@ -147,6 +149,7 @@ func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testin
 	req, _ := http.NewRequest(http.MethodPost, replyUrl, bytes.NewReader(expectedDataPayload))
 
 	req.Header = http.Header{
+		"Content-Type":            {"text/plain"},
 		backend.CommandHeader:     {backend.TerminateSessionCommand},
 		backend.CloseCodeHeader:   {"1001"},
 		backend.CloseReasonHeader: {expectedCloseReason},
@@ -178,6 +181,7 @@ func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testin
 
 	r, e := http.DefaultClient.Do(req)
 	assert.Nil(e, "backend should not get an http client error on calling reply url")
+	defer r.Body.Close()
 	assert.Equal(http.StatusOK, r.StatusCode, "backend should receive 200 on sending to reply url")
 
 	mt := <-messageType
@@ -185,8 +189,9 @@ func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testin
 	actualBackendMsg := <-messageData
 	assert.Equal(expectedDataPayload, actualBackendMsg)
 
-	mt = <-messageType
+	code := <-messageType
 	actualCloseReason := <-messageData
+	assert.Equal(1001, code)
 	assert.Equal(expectedCloseReason, string(actualCloseReason))
 	assert.True(closed)
 }

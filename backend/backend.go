@@ -253,6 +253,11 @@ func GetCloseCode(headerVal string) (int, error) {
 		return 0, fmt.Errorf("close code must be between 1000 and 4999")
 	}
 
+	switch closeCode {
+	case 1004, 1005, 1006, 1015:
+		return 0, fmt.Errorf("close code %d is reserved and must not be sent", closeCode)
+	}
+
 	return int(closeCode), nil
 }
 

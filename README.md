@@ -99,11 +99,19 @@ The backend can respond in two ways:
 
 Any response body in the 200-299 range will be forwarded back to the WebSocket client immediately.
 
+```http
+HTTP/1.1 200 OK
+Ws-Command: terminate-session
+Ws-Close-Code: 1001
+Ws-Close-Reason: Closing connection
+Content-Length: 0
+```
+
 #### 2.2 Async Reply
 
 The backend can send messages later using the reply channel URL provided in `Ws-Reply-Channel` header:
 
-```
+```http
 POST <reply-channel-url>
 Content-Type: text/plain
 
@@ -197,7 +205,8 @@ Goodbye!
 
 In the example above, the backend server would send a `Ws-Command: terminate-session` header to a session reply
 channel. The WebSocket session, along with the connection, will be closed gracefully with code 1000 by default.
-Close code and reason can be customized by providing `Ws-Close-Code` and `Ws-Close-Reason` headers.
+The close code and reason can be customized by providing `Ws-Close-Code` and `Ws-Close-Reason` headers. These headers
+are only honored when combined with `Ws-Command: terminate-session`.
 
 ```http
 POST /reply/550e8400-e29b-41d4-a716-446655440000 HTTP/1.1

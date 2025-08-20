@@ -200,6 +200,10 @@ func TestGetCloseCodeInvalid(t *testing.T) {
 		"999",
 		"5000",
 		"A",
+		"1004",
+		"1005",
+		"1006",
+		"1015",
 	}
 
 	for _, headerVal := range invalidHeaderVals {
