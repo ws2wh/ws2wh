@@ -6,6 +6,7 @@ package frontend
 import (
 	"log/slog"
 	"net/http"
+	"sync/atomic"
 
 	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,7 +23,7 @@ var upgrader = websocket.Upgrader{
 func NewWsHandler(logger slog.Logger, id string) *WebsocketHandler {
 	h := WebsocketHandler{
 		receiverChannel: make(chan []byte, 64),
-		signalChannel:   make(chan session.ConnectionSignal, 2),
+		signalChannel:   make(chan session.ConnectionSignal, 64),
 		logger:          logger,
 		sessionId:       id,
 	}
@@ -38,7 +39,7 @@ type WebsocketHandler struct {
 	conn            *websocket.Conn
 	logger          slog.Logger
 	sessionId       string
-	closed          bool
+	closed          atomic.Bool
 }
 
 // Send writes a message to the WebSocket connection
@@ -70,17 +71,34 @@ func (h *WebsocketHandler) Signal() <-chan session.ConnectionSignal {
 }
 
 // Close gracefully terminates the WebSocket connection
-func (h *WebsocketHandler) Close() error {
+func (h *WebsocketHandler) Close(closeCode int, closeReason *string) error {
+	if h.closed.Load() {
+		return nil
+	}
+
+	h.closed.Store(true)
+
+	defer func() {
+		err := h.conn.Close()
+		if err != nil {
+			h.logger.Error("Error while closing connection", "error", err)
+		}
+	}()
+
 	h.signalChannel <- session.ConnectionClosedSignal
 
-	h.closed = true
+	var reason string
+	if closeReason != nil {
+		reason = *closeReason
+	}
 
-	err := h.conn.WriteMessage(websocket.CloseMessage, make([]byte, 0))
+	closeMessage := websocket.FormatCloseMessage(closeCode, reason)
+	err := h.conn.WriteMessage(websocket.CloseMessage, closeMessage)
 	if err != nil {
 		return err
 	}
 
-	return h.conn.Close()
+	return nil
 }
 
 // Handle upgrades an HTTP connection to WebSocket and manages the connection lifecycle.
@@ -122,7 +140,7 @@ func (h *WebsocketHandler) handleReadMessageErr(err error) error {
 
 	defer func() { h.signalChannel <- session.ConnectionClosedSignal }()
 
-	if h.closed {
+	if h.closed.Load() {
 		m.DisconnectCounter.With(prometheus.Labels{
 			m.OriginLabel: m.OriginValueBackend,
 		}).Inc()

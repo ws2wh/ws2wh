@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -138,6 +139,104 @@ func TestWebhookServiceError(t *testing.T) {
 	assert.Zero(cbCount, "should not call the callback on HTTP error response")
 }
 
+func TestWebhookTerminateSessionWithCloseHeaders(t *testing.T) {
+	assert := assert.New(t)
+
+	fc := fakeHttpClient{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Status:     http.StatusText(200),
+				Header: http.Header{
+					CommandHeader:     []string{TerminateSessionCommand},
+					CloseCodeHeader:   []string{"4000"},
+					CloseReasonHeader: []string{"Shutting down"},
+				},
+				Body: io.NopCloser(bytes.NewReader(nil)),
+			},
+		},
+	}
+	wh := WebhookBackend{
+		url:    "http://backend/wh/" + uuid.NewString(),
+		client: &fc,
+	}
+	msg := BackendMessage{
+		SessionId:    uuid.NewString(),
+		ReplyChannel: "http://ws2wh-address/" + uuid.NewString(),
+		Event:        MessageReceived,
+		Payload:      []byte("payload"),
+	}
+	sh := testSessionHandle{}
+	err := wh.Send(msg, &sh)
+	assert.NoError(err)
+	assert.Equal(1, sh.closeCount)
+	assert.Equal(4000, sh.lastCloseCode)
+	if assert.NotNil(sh.lastCloseReason) {
+		assert.Equal("Shutting down", *sh.lastCloseReason)
+	}
+}
+
+func TestGetCloseCode(t *testing.T) {
+	validHeaderVals := []string{
+		"1001",
+		"",
+	}
+
+	expectedCloseCodes := []int{
+		1001,
+		1000,
+	}
+
+	for i, headerVal := range validHeaderVals {
+		assert := assert.New(t)
+		closeCode, err := GetCloseCode(headerVal)
+		assert.Nil(err)
+		assert.Equal(expectedCloseCodes[i], closeCode)
+	}
+}
+
+func TestGetCloseCodeInvalid(t *testing.T) {
+	invalidHeaderVals := []string{
+		"999",
+		"5000",
+		"A",
+		"1004",
+		"1005",
+		"1006",
+		"1015",
+	}
+
+	for _, headerVal := range invalidHeaderVals {
+		assert := assert.New(t)
+		closeCode, err := GetCloseCode(headerVal)
+		assert.NotNil(err)
+		assert.Equal(0, closeCode)
+	}
+}
+
+func TestGetCloseReason(t *testing.T) {
+	validHeaderVals := []string{
+		"",
+		"test",
+	}
+
+	for _, headerVal := range validHeaderVals {
+		assert := assert.New(t)
+		closeReason, err := GetCloseReason(headerVal)
+		assert.Nil(err)
+		assert.Equal(headerVal, *closeReason)
+	}
+}
+
+func TestGetCloseReasonInvalid(t *testing.T) {
+	invalidHeaderVal := strings.Repeat("a", 124)
+
+	assert := assert.New(t)
+	closeReason, err := GetCloseReason(invalidHeaderVal)
+	assert.NotNil(err)
+	assert.Nil(closeReason)
+}
+
 type fakeHttpClient struct {
 	Requests  []*http.Request
 	Responses []*http.Response
@@ -163,9 +262,11 @@ func (c *fakeHttpClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 type testSessionHandle struct {
-	lastPayload []byte
-	sendCount   int
-	closeCount  int
+	lastPayload     []byte
+	sendCount       int
+	closeCount      int
+	lastCloseCode   int
+	lastCloseReason *string
 }
 
 func (s *testSessionHandle) Send(payload []byte) error {
@@ -173,7 +274,9 @@ func (s *testSessionHandle) Send(payload []byte) error {
 	s.sendCount += 1
 	return nil
 }
-func (s *testSessionHandle) Close() error {
+func (s *testSessionHandle) Close(closeCode int, closeReason *string) error {
 	s.closeCount += 1
+	s.lastCloseCode = closeCode
+	s.lastCloseReason = closeReason
 	return nil
 }

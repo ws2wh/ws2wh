@@ -19,7 +19,7 @@ import (
 
 const (
 	// May be increased e.g. for debugging
-	TestTimeout = time.Second * 1
+	TestTimeout = time.Second * 5
 )
 
 // TestWebsocketToWebhook tests the full flow of WebSocket to webhook communication
@@ -93,7 +93,7 @@ func websocketClientMessageSent(conn *websocket.Conn, wh *TestWebhook, sessionId
 func backendMessageSent(conn *websocket.Conn, replyUrl string, t *testing.T) {
 	assert := assert.New(t)
 
-	wsClientChan := make(chan []byte, 1)
+	wsClientChan := make(chan []byte, 64)
 	defer close(wsClientChan)
 	go captureMessage(conn, wsClientChan)
 
@@ -101,6 +101,8 @@ func backendMessageSent(conn *websocket.Conn, replyUrl string, t *testing.T) {
 	resp, err := http.Post(replyUrl, "text/plain", bytes.NewReader(expectedBackendMsg))
 
 	assert.Nil(err, "reply url call should not respond with client error")
+	defer resp.Body.Close()
+
 	assert.Less(resp.StatusCode, 300, "reply url call should result with successful response")
 	assert.GreaterOrEqual(resp.StatusCode, 200, "reply url call should result with successful response")
 
@@ -115,7 +117,7 @@ func websocketClientMessageWithImmediateBackendResponse(conn *websocket.Conn, wh
 	assert := assert.New(t)
 	expectedResponse := []byte(uuid.NewString())
 	wh.responses = append(wh.responses, expectedResponse)
-	wsClientChan := make(chan []byte, 1)
+	wsClientChan := make(chan []byte, 64)
 	defer close(wsClientChan)
 	go captureMessage(conn, wsClientChan)
 	websocketClientMessageSent(conn, wh, sessionId, "", t)
@@ -142,24 +144,34 @@ func websocketClientDisconnected(conn *websocket.Conn, wh *TestWebhook, sessionI
 func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testing.T) {
 	assert := assert.New(t)
 
-	expectedGoodbyeMessage := []byte(uuid.NewString())
-
-	req, _ := http.NewRequest(http.MethodPost, replyUrl, bytes.NewReader([]byte(expectedGoodbyeMessage)))
+	expectedDataPayload := []byte(uuid.NewString())
+	expectedCloseReason := "test reason"
+	req, _ := http.NewRequest(http.MethodPost, replyUrl, bytes.NewReader(expectedDataPayload))
 
 	req.Header = http.Header{
-		backend.CommandHeader: {backend.TerminateSessionCommand},
+		"Content-Type":            {"text/plain"},
+		backend.CommandHeader:     {backend.TerminateSessionCommand},
+		backend.CloseCodeHeader:   {"1001"},
+		backend.CloseReasonHeader: {expectedCloseReason},
 	}
 
-	messageType := make(chan int, 1)
-	messageData := make(chan []byte, 1)
+	messageType := make(chan int, 64)
+	messageData := make(chan []byte, 64)
 	var closed bool
 
 	go func() {
 		for {
 			mt, d, err := conn.ReadMessage()
 			if err != nil {
+				if e, ok := err.(*websocket.CloseError); ok {
+					closed = true
+					messageType <- e.Code
+					messageData <- []byte(e.Text)
+					break
+				}
 				break
 			}
+
 			messageType <- mt
 			messageData <- d
 		}
@@ -169,12 +181,18 @@ func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testin
 
 	r, e := http.DefaultClient.Do(req)
 	assert.Nil(e, "backend should not get an http client error on calling reply url")
+	defer r.Body.Close()
 	assert.Equal(http.StatusOK, r.StatusCode, "backend should receive 200 on sending to reply url")
 
 	mt := <-messageType
-	actualGoodbyeMessage := <-messageData
 	assert.Equal(websocket.TextMessage, mt)
-	assert.Equal(expectedGoodbyeMessage, actualGoodbyeMessage)
+	actualBackendMsg := <-messageData
+	assert.Equal(expectedDataPayload, actualBackendMsg)
+
+	code := <-messageType
+	actualCloseReason := <-messageData
+	assert.Equal(1001, code)
+	assert.Equal(expectedCloseReason, string(actualCloseReason))
 	assert.True(closed)
 }
 

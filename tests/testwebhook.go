@@ -22,7 +22,7 @@ type TestWebhook struct {
 func CreateTestWebhook() *TestWebhook {
 	httpHandler := mux.NewRouter()
 	b := TestWebhook{
-		messages:    make(chan backend.BackendMessage, 100),
+		messages:    make(chan backend.BackendMessage, 128),
 		httpHandler: httpHandler,
 		responses:   make([][]byte, 0),
 		server:      nil,

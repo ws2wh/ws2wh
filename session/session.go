@@ -51,9 +51,13 @@ func (s *Session) Send(message []byte) error {
 
 // Close terminates the WebSocket connection for this session
 // Returns an error if closing the connection fails
-func (s *Session) Close() error {
-	s.Logger.Debug("Closing WebSocket connection", "sessionId", s.Id)
-	return s.Connection.Close()
+func (s *Session) Close(closeCode int, closeReason *string) error {
+	s.Logger.Debug("Closing WebSocket connection",
+		"sessionId", s.Id,
+		"closeCode", closeCode,
+		"closeReason", closeReason,
+	)
+	return s.Connection.Close(closeCode, closeReason)
 }
 
 // Receive handles the WebSocket session lifecycle and message flow
@@ -129,7 +133,7 @@ type WebsocketConn interface {
 	Send(payload []byte) error
 	Receiver() <-chan []byte
 	Signal() <-chan ConnectionSignal
-	Close() error
+	Close(closeCode int, closeReason *string) error
 }
 
 // SessionParams contains the configuration parameters for creating a new Session

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
 	metrics "github.com/ws2wh/ws2wh/metrics/directory"
@@ -30,6 +31,14 @@ const JwtClaimsHeader = "Ws-Session-Jwt-Claims"
 
 // CommandHeader specifies the command to execute on the WebSocket connection
 const CommandHeader = "Ws-Command"
+
+// CloseCodeHeader contains the close code to use when closing the WebSocket connection
+// Default is 1000
+const CloseCodeHeader = "Ws-Close-Code"
+
+// CloseReasonHeader contains the reason for closing the WebSocket connection
+// Defaults to empty value
+const CloseReasonHeader = "Ws-Close-Reason"
 
 // SendMessageCommand instructs the server to send a message to the WebSocket client
 const SendMessageCommand = "send-message"
@@ -141,6 +150,11 @@ type WebhookBackend struct {
 // Returns an error if the request fails or receives a non-2xx response
 func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 	req, err := http.NewRequest(http.MethodPost, w.url, bytes.NewReader(msg.Payload))
+	if err != nil {
+		slog.Error("Error while creating request", "error", err, "sessionId", msg.SessionId)
+		return err
+	}
+
 	h := http.Header{
 		SessionIdHeader:    {msg.SessionId},
 		ReplyChannelHeader: {msg.ReplyChannel},
@@ -157,11 +171,6 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 
 	req.Header = h
 
-	if err != nil {
-		slog.Error("Error while creating request", "error", err, "sessionId", msg.SessionId)
-		return err
-	}
-
 	res, err := w.client.Do(req)
 	if err != nil {
 		slog.Error("Error while sending message to backend", "error", err, "sessionId", msg.SessionId)
@@ -171,6 +180,8 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 
 		return err
 	}
+
+	defer res.Body.Close()
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		slog.Error("Unsuccessful delivery to backend", "status", res.StatusCode, "sessionId", msg.SessionId)
@@ -206,13 +217,56 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 	}
 
 	if res.Header.Get(CommandHeader) == TerminateSessionCommand {
-		err = session.Close()
+		closeCode, err := GetCloseCode(res.Header.Get(CloseCodeHeader))
+		if err != nil {
+			slog.Error("Error while getting close code", "error", err, "sessionId", msg.SessionId)
+			return err
+		}
+
+		closeReason, err := GetCloseReason(res.Header.Get(CloseReasonHeader))
+		if err != nil {
+			slog.Error("Error while getting close reason", "error", err, "sessionId", msg.SessionId)
+			return err
+		}
+
+		err = session.Close(closeCode, closeReason)
 		if err != nil {
 			slog.Error("Error while closing session", "error", err, "sessionId", msg.SessionId)
 			return err
 		}
 	}
+
 	return nil
+}
+
+func GetCloseCode(headerVal string) (int, error) {
+	if headerVal == "" {
+		return 1000, nil
+	}
+
+	closeCode, err := strconv.ParseInt(headerVal, 10, 32)
+	if err != nil {
+		return 0, err
+	}
+
+	if closeCode < 1000 || closeCode > 4999 {
+		return 0, fmt.Errorf("close code must be between 1000 and 4999")
+	}
+
+	switch closeCode {
+	case 1004, 1005, 1006, 1015:
+		return 0, fmt.Errorf("close code %d is reserved and must not be sent", closeCode)
+	}
+
+	return int(closeCode), nil
+}
+
+func GetCloseReason(headerVal string) (*string, error) {
+	if len(headerVal) > 123 {
+		return nil, fmt.Errorf("close reason must be less than 123 bytes")
+	}
+
+	return &headerVal, nil
 }
 
 // SessionHandle provides an interface for interacting with a WebSocket session
@@ -223,6 +277,8 @@ type SessionHandle interface {
 	Send(message []byte) error
 
 	// Close terminates the WebSocket session
+	// closeCode is the close code to use when closing the WebSocket connection
+	// closeReason is the reason for closing the WebSocket connection
 	// Returns an error if the close fails
-	Close() error
+	Close(closeCode int, closeReason *string) error
 }

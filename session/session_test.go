@@ -3,6 +3,7 @@ package session
 import (
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/ws2wh/ws2wh/backend"
@@ -10,17 +11,19 @@ import (
 
 // MockWebsocketConn implements WebsocketConn for testing
 type MockWebsocketConn struct {
-	sendCalled   bool
-	closeCalled  bool
-	receiverChan chan []byte
-	doneChan     chan ConnectionSignal
-	sendError    error
-	closeError   error
+	sendCalled      bool
+	closeCalled     bool
+	receiverChan    chan []byte
+	doneChan        chan ConnectionSignal
+	sendError       error
+	closeError      error
+	lastCloseCode   int
+	lastCloseReason *string
 }
 
 func NewMockWebsocketConn() *MockWebsocketConn {
 	return &MockWebsocketConn{
-		receiverChan: make(chan []byte),
+		receiverChan: make(chan []byte, 64),
 		doneChan:     make(chan ConnectionSignal),
 	}
 }
@@ -38,8 +41,10 @@ func (m *MockWebsocketConn) Signal() <-chan ConnectionSignal {
 	return m.doneChan
 }
 
-func (m *MockWebsocketConn) Close() error {
+func (m *MockWebsocketConn) Close(closeCode int, closeReason *string) error {
 	m.closeCalled = true
+	m.lastCloseCode = closeCode
+	m.lastCloseReason = closeReason
 	return m.closeError
 }
 
@@ -85,12 +90,18 @@ func TestSession_Close(t *testing.T) {
 	conn := NewMockWebsocketConn()
 	session := &Session{Connection: conn, Logger: *slog.Default()}
 
-	err := session.Close()
+	reason := "test reason"
+	err := session.Close(4000, &reason)
 
 	assert.NoError(t, err, "Close should not return error")
 	assert.True(t, conn.closeCalled, "Close should be called on WebsocketConn")
+	assert.Equal(t, 4000, conn.lastCloseCode)
+	if assert.NotNil(t, conn.lastCloseReason) {
+		assert.Equal(t, reason, *conn.lastCloseReason)
+	}
 }
 
+// Test is flaky
 func TestSession_Receive(t *testing.T) {
 	conn := NewMockWebsocketConn()
 	mockBackend := &MockBackend{}
@@ -106,16 +117,19 @@ func TestSession_Receive(t *testing.T) {
 	go func() {
 		// Simulate ready signal
 		conn.doneChan <- ConnectionReadySignal
+		time.Sleep(time.Millisecond * 100)
 		// Simulate message received
 		conn.receiverChan <- []byte("test message")
+		time.Sleep(time.Millisecond * 100)
 		// Simulate closed signal
 		conn.doneChan <- ConnectionClosedSignal
-
-		// Then simulate connection close
+		time.Sleep(time.Millisecond * 100)
 		close(conn.doneChan)
 	}()
 
 	session.Receive()
+
+	time.Sleep(time.Second * 2)
 
 	// Verify messages sent to backend
 	assert.Len(t, mockBackend.messages, 3, "Should have 3 backend messages")

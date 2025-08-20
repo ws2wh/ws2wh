@@ -175,6 +175,7 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(SessionResponse{Success: false, Message: "INVALID_REQUEST"})
 		return
 	}
+	defer r.Body.Close()
 
 	session := s.getSession(id)
 	if session == nil {
@@ -194,7 +195,23 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Header.Get(backend.CommandHeader) == backend.TerminateSessionCommand {
-		err := session.Close()
+		closeCode, err := backend.GetCloseCode(r.Header.Get(backend.CloseCodeHeader))
+		if err != nil {
+			slog.Error("Error while getting close code", "error", err)
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(SessionResponse{Success: false, Message: "INVALID_CLOSE_CODE"})
+			return
+		}
+
+		closeReason, err := backend.GetCloseReason(r.Header.Get(backend.CloseReasonHeader))
+		if err != nil {
+			slog.Error("Error while getting close reason", "error", err)
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(SessionResponse{Success: false, Message: "INVALID_CLOSE_REASON"})
+			return
+		}
+
+		err = session.Close(closeCode, closeReason)
 
 		if err != nil {
 			slog.Error("Error while closing session", "error", err)
