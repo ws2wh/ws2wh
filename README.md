@@ -1,17 +1,20 @@
 # WS2WH ![build workflow](https://github.com/ws2wh/ws2wh/actions/workflows/build.yml/badge.svg) ![secscan workflow](https://github.com/ws2wh/ws2wh/actions/workflows/secscan.yml/badge.svg)
 
-WS2WH is a lightweight bridge that connects WebSocket clients to HTTP webhook endpoints. It enables real-time, bidirectional communication by converting WebSocket messages into HTTP POST requests and vice versa. This tool is particularly useful when you need to integrate WebSocket-based clients with HTTP-only backend services, or when you want to add WebSocket support to existing HTTP APIs without modifying the backend. With a simple configuration, WS2WH handles the protocol translation and message routing, making it an ideal solution for scenarios requiring real-time updates in HTTP-based architectures.
+WS2WH is a lightweight bridge that connects WebSocket clients to HTTP webhook endpoints. It enables real-time,
+bidirectional communication by converting WebSocket messages into HTTP POST requests and vice versa. This tool is
+particularly useful when you need to integrate WebSocket-based clients with HTTP-only backend services, or when you
+want to add WebSocket support to existing HTTP APIs without modifying the backend. With a simple configuration, WS2WH
+handles the protocol translation and message routing, making it an ideal solution for scenarios requiring real-time
+updates in HTTP-based architectures.
 
-## Usage
-
-```
+## Usage```shell
 ws2wh -b https://example.com/api/v1/webhook -r /reply -l :3000 -p / -v INFO -h localhost
 ```
 
 Parameters can be provided either as command-line flags or environment variables:
 
 | Flag               | Environment Variable           | Default                   | Description                                                         |
-|--------------------|--------------------------------|---------------------------|---------------------------------------------------------------------|
+| ------------------ | ------------------------------ | ------------------------- | ------------------------------------------------------------------- |
 | `-b`               | `BACKEND_URL`                  | (required)                | Webhook backend URL that will receive POST requests from the relay  |
 | `-r`               | `REPLY_PATH_PREFIX`            | `/reply`                  | Path prefix for backend replies                                     |
 | `-l`               | `WS_PORT`                      | `:3000`                   | Address and port for the WebSocket server to listen on              |
@@ -33,7 +36,7 @@ Parameters can be provided either as command-line flags or environment variables
 
 Example using environment variables:
 
-```bash
+```shell
 export BACKEND_URL=https://example.com/api/v1/webhook
 export REPLY_PATH_PREFIX=/reply
 export WS_PORT=3000
@@ -63,7 +66,8 @@ ws2wh
 3. The server converts WebSocket messages into HTTP POST requests and sends them to the specified backend URL.
 4. The backend processes the request and sends a response back to the WebSocket server.
 5. The server converts the response into a WebSocket message and sends it back to the client.
-6. The process repeats for each message, allowing for real-time, bidirectional communication between the client and the backend.
+6. The process repeats for each message, allowing for real-time, bidirectional communication between the client and the
+backend.
 
 ## Bridge to Backend Communication Protocol
 
@@ -71,7 +75,7 @@ ws2wh
 
 When WS2WH forwards messages to the backend, it sends HTTP POST requests with the following headers:
 
-```
+```http
 Ws-Session-Id: <unique session identifier>
 Ws-Query-String: <query string from the WS client (if any)>
 Ws-Reply-Channel: <reply URL for this session>
@@ -80,6 +84,7 @@ Ws-Session-Jwt-Claims: <JSON string of JWT claims from the client (if any)>
 ```
 
 Event types can be:
+
 - `client-connected` - When a new WebSocket client connects
 - `message-received` - When a WebSocket client sends a message
 - `client-disconnected` - When a WebSocket client disconnects
@@ -91,9 +96,11 @@ The request body contains the raw message payload from the WebSocket client (emp
 The backend can respond in two ways:
 
 #### 2.1 Immediate Response
+
 Any response body in the 200-299 range will be forwarded back to the WebSocket client immediately.
 
 #### 2.2 Async Reply
+
 The backend can send messages later using the reply channel URL provided in `Ws-Reply-Channel` header:
 
 ```
@@ -107,7 +114,7 @@ Content-Type: text/plain
 
 The backend can terminate a WebSocket session by including a special header in the reply:
 
-```
+```http
 POST <reply-channel-url>
 Ws-Command: terminate-session
 
@@ -115,12 +122,14 @@ Ws-Command: terminate-session
 ```
 
 This will:
+
 1. Send the message body to the WebSocket client (if provided)
 2. Close the WebSocket connection
 
 ### Example Flow
 
 #### 1. WebSocket Client Connection
+
 When a new WebSocket client connects to WS2WH:
 
 ```http
@@ -134,6 +143,7 @@ Content-Length: 0
 ```
 
 #### 2. Client Message Forwarding
+
 When the WebSocket client sends a message:
 
 ```http
@@ -150,6 +160,7 @@ Hello, backend
 #### 3. Backend Responses
 
 ##### 3.1 Immediate Response
+
 ```http
 HTTP/1.1 200 OK
 Content-Type: text/plain
@@ -159,6 +170,7 @@ Immediate response to client
 ```
 
 ##### 3.2 Async Response
+
 ```http
 POST /reply/550e8400-e29b-41d4-a716-446655440000 HTTP/1.1
 Host: ws2wh-host:3000
@@ -170,7 +182,8 @@ Async message to client
 
 #### 4. Session Termination
 
-The session can be proactively terminated by the backend by sending a `Ws-Command: terminate-session` header to a session reply channel.
+The session can be proactively terminated by the backend by sending a `Ws-Command: terminate-session` header to a
+session reply channel.
 
 ```http
 POST /reply/550e8400-e29b-41d4-a716-446655440000 HTTP/1.1
@@ -182,15 +195,19 @@ Content-Length: 10
 Goodbye!
 ```
 
-In the example above, the backend server would send a `Ws-Command: terminate-session` header to a session reply channel. The websocket session, along with the connection, will get closed gracefully with code 1000 by default.
-Close details can be customized by providing `Ws-Close-Code` and `Ws-Close-Reason` headers.
+In the example above, the backend server would send a `Ws-Command: terminate-session` header to a session reply
+channel. The WebSocket session, along with the connection, will be closed gracefully with code 1000 by default.
+Close code and reason can be customized by providing `Ws-Close-Code` and `Ws-Close-Reason` headers.
 
 ```http
 POST /reply/550e8400-e29b-41d4-a716-446655440000 HTTP/1.1
 Host: ws2wh-host:3000
 Ws-Command: terminate-session
 Ws-Close-Code: 1000
-Ws-Close-Reason: "Closing connection"
+Ws-Close-Reason: Closing connection
 ```
 
-`Ws-Close-Code` value can be any integer value, although it is recommended to use one of the [standard close codes](https://www.rfc-editor.org/rfc/rfc6455#section-7.4). `Ws-Close-Reason` is a string value that will be sent to the WebSocket client.
+`Ws-Close-Code` must be an integer between 1000 and 4999. Avoid reserved codes 1005, 1006, and 1015. Prefer
+[standard close codes](https://www.rfc-editor.org/rfc/rfc6455#section-7.4); for application-defined purposes use the
+3000–4999 range. `Ws-Close-Reason` is a UTF-8 string sent to the WebSocket client (keep it under 123 bytes to fit the
+close frame payload limits).
