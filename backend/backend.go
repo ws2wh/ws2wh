@@ -150,6 +150,11 @@ type WebhookBackend struct {
 // Returns an error if the request fails or receives a non-2xx response
 func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 	req, err := http.NewRequest(http.MethodPost, w.url, bytes.NewReader(msg.Payload))
+	if err != nil {
+		slog.Error("Error while creating request", "error", err, "sessionId", msg.SessionId)
+		return err
+	}
+
 	h := http.Header{
 		SessionIdHeader:    {msg.SessionId},
 		ReplyChannelHeader: {msg.ReplyChannel},
@@ -166,11 +171,6 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 
 	req.Header = h
 
-	if err != nil {
-		slog.Error("Error while creating request", "error", err, "sessionId", msg.SessionId)
-		return err
-	}
-
 	res, err := w.client.Do(req)
 	if err != nil {
 		slog.Error("Error while sending message to backend", "error", err, "sessionId", msg.SessionId)
@@ -180,6 +180,8 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 
 		return err
 	}
+
+	defer res.Body.Close()
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		slog.Error("Unsuccessful delivery to backend", "status", res.StatusCode, "sessionId", msg.SessionId)
