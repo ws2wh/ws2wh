@@ -93,7 +93,7 @@ func websocketClientMessageSent(conn *websocket.Conn, wh *TestWebhook, sessionId
 func backendMessageSent(conn *websocket.Conn, replyUrl string, t *testing.T) {
 	assert := assert.New(t)
 
-	wsClientChan := make(chan []byte, 1)
+	wsClientChan := make(chan []byte, 64)
 	defer close(wsClientChan)
 	go captureMessage(conn, wsClientChan)
 
@@ -115,7 +115,7 @@ func websocketClientMessageWithImmediateBackendResponse(conn *websocket.Conn, wh
 	assert := assert.New(t)
 	expectedResponse := []byte(uuid.NewString())
 	wh.responses = append(wh.responses, expectedResponse)
-	wsClientChan := make(chan []byte, 1)
+	wsClientChan := make(chan []byte, 64)
 	defer close(wsClientChan)
 	go captureMessage(conn, wsClientChan)
 	websocketClientMessageSent(conn, wh, sessionId, "", t)
@@ -152,8 +152,8 @@ func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testin
 		backend.CloseReasonHeader: {expectedCloseReason},
 	}
 
-	messageType := make(chan int)
-	messageData := make(chan []byte)
+	messageType := make(chan int, 64)
+	messageData := make(chan []byte, 64)
 	var closed bool
 
 	go func() {

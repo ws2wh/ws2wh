@@ -20,8 +20,8 @@ type MockWebsocketConn struct {
 
 func NewMockWebsocketConn() *MockWebsocketConn {
 	return &MockWebsocketConn{
-		receiverChan: make(chan []byte),
-		doneChan:     make(chan ConnectionSignal),
+		receiverChan: make(chan []byte, 64),
+		doneChan:     make(chan ConnectionSignal, 64),
 	}
 }
 

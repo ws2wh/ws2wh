@@ -22,7 +22,7 @@ var upgrader = websocket.Upgrader{
 func NewWsHandler(logger slog.Logger, id string) *WebsocketHandler {
 	h := WebsocketHandler{
 		receiverChannel: make(chan []byte, 64),
-		signalChannel:   make(chan session.ConnectionSignal, 2),
+		signalChannel:   make(chan session.ConnectionSignal, 64),
 		logger:          logger,
 		sessionId:       id,
 	}
@@ -71,9 +71,16 @@ func (h *WebsocketHandler) Signal() <-chan session.ConnectionSignal {
 
 // Close gracefully terminates the WebSocket connection
 func (h *WebsocketHandler) Close(closeCode int, closeReason *string) error {
-	h.signalChannel <- session.ConnectionClosedSignal
+	defer func() {
+		err := h.conn.Close()
+		if err != nil {
+			slog.Error("Error while closing connection", "error", err)
+		}
+	}()
 
 	h.closed = true
+
+	h.signalChannel <- session.ConnectionClosedSignal
 
 	closeMessage := websocket.FormatCloseMessage(closeCode, *closeReason)
 	err := h.conn.WriteMessage(websocket.CloseMessage, closeMessage)
@@ -81,7 +88,7 @@ func (h *WebsocketHandler) Close(closeCode int, closeReason *string) error {
 		return err
 	}
 
-	return h.conn.Close()
+	return nil
 }
 
 // Handle upgrades an HTTP connection to WebSocket and manages the connection lifecycle.
