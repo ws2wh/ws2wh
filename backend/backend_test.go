@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -136,6 +137,63 @@ func TestWebhookServiceError(t *testing.T) {
 
 	assert.NotNil(err)
 	assert.Zero(cbCount, "should not call the callback on HTTP error response")
+}
+
+func TestGetCloseCode(t *testing.T) {
+	validHeaderVals := []string{
+		"1001",
+		"",
+	}
+
+	expectedCloseCodes := []int{
+		1001,
+		1000,
+	}
+
+	for i, headerVal := range validHeaderVals {
+		assert := assert.New(t)
+		closeCode, err := GetCloseCode(headerVal)
+		assert.Nil(err)
+		assert.Equal(expectedCloseCodes[i], closeCode)
+	}
+}
+
+func TestGetCloseCodeInvalid(t *testing.T) {
+	invalidHeaderVals := []string{
+		"999",
+		"5000",
+		"A",
+	}
+
+	for _, headerVal := range invalidHeaderVals {
+		assert := assert.New(t)
+		closeCode, err := GetCloseCode(headerVal)
+		assert.NotNil(err)
+		assert.Equal(0, closeCode)
+	}
+}
+
+func TestGetCloseReason(t *testing.T) {
+	validHeaderVals := []string{
+		"",
+		"test",
+	}
+
+	for _, headerVal := range validHeaderVals {
+		assert := assert.New(t)
+		closeReason, err := GetCloseReason(headerVal)
+		assert.Nil(err)
+		assert.Equal(headerVal, *closeReason)
+	}
+}
+
+func TestGetCloseReasonInvalid(t *testing.T) {
+	invalidHeaderVal := strings.Repeat("a", 124)
+
+	assert := assert.New(t)
+	closeReason, err := GetCloseReason(invalidHeaderVal)
+	assert.NotNil(err)
+	assert.Nil(closeReason)
 }
 
 type fakeHttpClient struct {
