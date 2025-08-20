@@ -215,13 +215,19 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 	}
 
 	if res.Header.Get(CommandHeader) == TerminateSessionCommand {
-		closeCode, err := getCloseCode(res, msg)
+		closeCode, err := GetCloseCode(res.Header.Get(CloseCodeHeader))
 		if err != nil {
 			slog.Error("Error while getting close code", "error", err, "sessionId", msg.SessionId)
 			return err
 		}
-		closeReason := res.Header.Get(CloseReasonHeader)
-		err = session.Close(int(closeCode), &closeReason)
+
+		closeReason, err := GetCloseReason(res.Header.Get(CloseReasonHeader))
+		if err != nil {
+			slog.Error("Error while getting close reason", "error", err, "sessionId", msg.SessionId)
+			return err
+		}
+
+		err = session.Close(closeCode, closeReason)
 		if err != nil {
 			slog.Error("Error while closing session", "error", err, "sessionId", msg.SessionId)
 			return err
@@ -231,19 +237,29 @@ func (w *WebhookBackend) Send(msg BackendMessage, session SessionHandle) error {
 	return nil
 }
 
-func getCloseCode(res *http.Response, msg BackendMessage) (int, error) {
-	headerVal := res.Header.Get(CloseCodeHeader)
+func GetCloseCode(headerVal string) (int, error) {
 	if headerVal == "" {
 		return 1000, nil
 	}
 
 	closeCode, err := strconv.ParseInt(headerVal, 10, 32)
 	if err != nil {
-		slog.Error("Error while parsing close code", "error", err, "sessionId", msg.SessionId)
 		return 0, err
 	}
 
+	if closeCode < 1000 || closeCode > 4999 {
+		return 0, fmt.Errorf("close code must be between 1000 and 4999")
+	}
+
 	return int(closeCode), nil
+}
+
+func GetCloseReason(headerVal string) (*string, error) {
+	if len(headerVal) > 123 {
+		return nil, fmt.Errorf("close reason must be less than 123 bytes")
+	}
+
+	return &headerVal, nil
 }
 
 // SessionHandle provides an interface for interacting with a WebSocket session

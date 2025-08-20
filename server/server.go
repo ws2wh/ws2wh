@@ -9,7 +9,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -195,12 +194,17 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Header.Get(backend.CommandHeader) == backend.TerminateSessionCommand {
-		closeCode, err := strconv.ParseInt(r.Header.Get(backend.CloseCodeHeader), 10, 32)
+		closeCode, err := backend.GetCloseCode(r.Header.Get(backend.CloseCodeHeader))
 		if err != nil {
-			slog.Error("Error while parsing close code", "error", err)
+			slog.Error("Error while getting close code", "error", err)
 		}
-		closeReason := r.Header.Get(backend.CloseReasonHeader)
-		err = session.Close(int(closeCode), &closeReason)
+
+		closeReason, err := backend.GetCloseReason(r.Header.Get(backend.CloseReasonHeader))
+		if err != nil {
+			slog.Error("Error while getting close reason", "error", err)
+		}
+
+		err = session.Close(closeCode, closeReason)
 
 		if err != nil {
 			slog.Error("Error while closing session", "error", err)
