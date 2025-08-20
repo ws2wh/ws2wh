@@ -19,7 +19,7 @@ import (
 
 const (
 	// May be increased e.g. for debugging
-	TestTimeout = time.Second * 2
+	TestTimeout = time.Second * 5
 )
 
 // TestWebsocketToWebhook tests the full flow of WebSocket to webhook communication

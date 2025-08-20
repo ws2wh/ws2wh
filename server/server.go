@@ -175,6 +175,7 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(SessionResponse{Success: false, Message: "INVALID_REQUEST"})
 		return
 	}
+	defer r.Body.Close()
 
 	session := s.getSession(id)
 	if session == nil {
