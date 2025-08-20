@@ -139,6 +139,43 @@ func TestWebhookServiceError(t *testing.T) {
 	assert.Zero(cbCount, "should not call the callback on HTTP error response")
 }
 
+func TestWebhookTerminateSessionWithCloseHeaders(t *testing.T) {
+	assert := assert.New(t)
+
+	fc := fakeHttpClient{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Status:     http.StatusText(200),
+				Header: http.Header{
+					CommandHeader:     []string{TerminateSessionCommand},
+					CloseCodeHeader:   []string{"4000"},
+					CloseReasonHeader: []string{"Shutting down"},
+				},
+				Body: io.NopCloser(bytes.NewReader(nil)),
+			},
+		},
+	}
+	wh := WebhookBackend{
+		url:    "http://backend/wh/" + uuid.NewString(),
+		client: &fc,
+	}
+	msg := BackendMessage{
+		SessionId:    uuid.NewString(),
+		ReplyChannel: "http://ws2wh-address/" + uuid.NewString(),
+		Event:        MessageReceived,
+		Payload:      []byte("payload"),
+	}
+	sh := testSessionHandle{}
+	err := wh.Send(msg, &sh)
+	assert.NoError(err)
+	assert.Equal(1, sh.closeCount)
+	assert.Equal(4000, sh.lastCloseCode)
+	if assert.NotNil(sh.lastCloseReason) {
+		assert.Equal("Shutting down", *sh.lastCloseReason)
+	}
+}
+
 func TestGetCloseCode(t *testing.T) {
 	validHeaderVals := []string{
 		"1001",
@@ -221,9 +258,11 @@ func (c *fakeHttpClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 type testSessionHandle struct {
-	lastPayload []byte
-	sendCount   int
-	closeCount  int
+	lastPayload     []byte
+	sendCount       int
+	closeCount      int
+	lastCloseCode   int
+	lastCloseReason *string
 }
 
 func (s *testSessionHandle) Send(payload []byte) error {
@@ -233,5 +272,7 @@ func (s *testSessionHandle) Send(payload []byte) error {
 }
 func (s *testSessionHandle) Close(closeCode int, closeReason *string) error {
 	s.closeCount += 1
+	s.lastCloseCode = closeCode
+	s.lastCloseReason = closeReason
 	return nil
 }

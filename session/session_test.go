@@ -10,12 +10,14 @@ import (
 
 // MockWebsocketConn implements WebsocketConn for testing
 type MockWebsocketConn struct {
-	sendCalled   bool
-	closeCalled  bool
-	receiverChan chan []byte
-	doneChan     chan ConnectionSignal
-	sendError    error
-	closeError   error
+	sendCalled      bool
+	closeCalled     bool
+	receiverChan    chan []byte
+	doneChan        chan ConnectionSignal
+	sendError       error
+	closeError      error
+	lastCloseCode   int
+	lastCloseReason *string
 }
 
 func NewMockWebsocketConn() *MockWebsocketConn {
@@ -40,6 +42,8 @@ func (m *MockWebsocketConn) Signal() <-chan ConnectionSignal {
 
 func (m *MockWebsocketConn) Close(closeCode int, closeReason *string) error {
 	m.closeCalled = true
+	m.lastCloseCode = closeCode
+	m.lastCloseReason = closeReason
 	return m.closeError
 }
 
@@ -85,10 +89,15 @@ func TestSession_Close(t *testing.T) {
 	conn := NewMockWebsocketConn()
 	session := &Session{Connection: conn, Logger: *slog.Default()}
 
-	err := session.Close(1000, nil)
+	reason := "test reason"
+	err := session.Close(4000, &reason)
 
 	assert.NoError(t, err, "Close should not return error")
 	assert.True(t, conn.closeCalled, "Close should be called on WebsocketConn")
+	assert.Equal(t, 4000, conn.lastCloseCode)
+	if assert.NotNil(t, conn.lastCloseReason) {
+		assert.Equal(t, reason, *conn.lastCloseReason)
+	}
 }
 
 func TestSession_Receive(t *testing.T) {

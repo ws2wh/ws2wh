@@ -144,7 +144,7 @@ func sessionTerminatedByBackend(conn *websocket.Conn, replyUrl string, t *testin
 
 	expectedDataPayload := []byte(uuid.NewString())
 	expectedCloseReason := "test reason"
-	req, _ := http.NewRequest(http.MethodPost, replyUrl, bytes.NewReader([]byte(expectedDataPayload)))
+	req, _ := http.NewRequest(http.MethodPost, replyUrl, bytes.NewReader(expectedDataPayload))
 
 	req.Header = http.Header{
 		backend.CommandHeader:     {backend.TerminateSessionCommand},
